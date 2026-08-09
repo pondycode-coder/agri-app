@@ -4,19 +4,30 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./context/AuthProvider";
-import Index from "./pages/Index";
+import { I18nProvider } from "./context/I18nProvider";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import ForgotPassword from "./pages/ForgotPassword";
 import Dashboard from "./pages/Dashboard";
+import Farms from "./pages/Farms";
+import Plots from "./pages/Plots";
+import CropCycles from "./pages/CropCycles";
+import Inventory from "./pages/Inventory";
+import Workers from "./pages/Workers";
+import Tasks from "./pages/Tasks";
+import Financials from "./pages/Financials";
+import Contacts from "./pages/Contacts";
+import Investments from "./pages/Investments";
+import Profile from "./pages/Profile";
 import { useAuth } from "./context/AuthProvider";
 
 // Private route component
-const PrivateRoute = ({ element }: { element: React.ReactElement }) => {
+const PrivateRoute = ({ children }: { children: React.ReactElement }) => {
   const { user, loading } = useAuth();
   if (loading) return <div>Loading...</div>;
-  return user ? element : <Navigate to="/login" replace />;
+  return user ? children : <Navigate to="/login" replace />;
 };
 
 const queryClient = new QueryClient();
@@ -29,22 +40,24 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
+          <ErrorBoundary>
           <Routes>
             {/* Public routes */}
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             {/* Protected routes */}
-            <Route
-              path="/dashboard"
-              element={
-                <PrivateRoute>
-                  <Dashboard />
-                </PrivateRoute>
-              }
-            >
-              {/* We'll add child routes for each entity here later */}
-            </Route>
+            <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
+            <Route path="/dashboard/farms" element={<PrivateRoute><Farms /></PrivateRoute>} />
+            <Route path="/dashboard/plots" element={<PrivateRoute><Plots /></PrivateRoute>} />
+            <Route path="/dashboard/crops" element={<PrivateRoute><CropCycles /></PrivateRoute>} />
+            <Route path="/dashboard/inventory" element={<PrivateRoute><Inventory /></PrivateRoute>} />
+            <Route path="/dashboard/workers" element={<PrivateRoute><Workers /></PrivateRoute>} />
+            <Route path="/dashboard/tasks" element={<PrivateRoute><Tasks /></PrivateRoute>} />
+            <Route path="/dashboard/financials" element={<PrivateRoute><Financials /></PrivateRoute>} />
+            <Route path="/dashboard/contacts" element={<PrivateRoute><Contacts /></PrivateRoute>} />
+            <Route path="/dashboard/investments" element={<PrivateRoute><Investments /></PrivateRoute>} />
+            <Route path="/dashboard/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
             {/* Home route - redirect to dashboard if authenticated, else to login */}
             <Route
               path="/"
@@ -57,6 +70,7 @@ const App = () => (
             {/* Catch-all for 404 */}
             <Route path="*" element={<NotFound />} />
           </Routes>
+          </ErrorBoundary>
         </BrowserRouter>
       </TooltipProvider>
     </AuthProvider>

@@ -5,8 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { LucideIcon, Mail, Lock, UserPlus, Loader2 } from "lucide-react";
-import { AlertTriangle, CheckCircle } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 
 const LoginPage: React.FC = () => {
@@ -24,8 +24,8 @@ const LoginPage: React.FC = () => {
     try {
       await signIn(email, password);
       navigate("/dashboard", { replace: true });
-    } catch (err: any) {
-      setError(err.message || "An error occurred");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
       setLoading(false);
     }

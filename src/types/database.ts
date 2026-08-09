@@ -103,6 +103,7 @@ export interface FarmTask {
   assigned_date: string;
   due_date: string;
   completed_date?: string | null;
+  wage_amount?: number | null;
   wage_paid: boolean;
   notes?: string;
   created_at: string;
@@ -119,6 +120,7 @@ export interface FinancialRecord {
   category: string; // 'Crop Sales', 'Worker Wage', 'Fertilizer Purchase', 'Fuel', 'Equipment', 'Other'
   farm_id: string;
   worker_id?: string | null;
+  task_id?: string | null;
   payment_method: 'cash' | 'orange_money' | 'mtn_momo' | 'bank_transfer';
   receipt_url?: string;
   related_contact_id?: string | null;

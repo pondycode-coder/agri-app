@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { MainLayout } from '@/components/MainLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,16 +9,13 @@ import { formatFCFA } from '@/types/database';
 import { Link } from 'react-router-dom';
 import {
   Tractor,
-  Grid as GridIcon,
   Sprout,
-  Users,
   CheckSquare,
   Package,
   TrendingUp,
   TrendingDown,
   DollarSign,
   AlertTriangle,
-  Plus,
   ArrowRight,
   BarChart3,
 } from 'lucide-react';
@@ -265,7 +262,7 @@ export default function Dashboard() {
                       tickFormatter={(value) => `${(value / 1000000).toFixed(1)}M`}
                     />
                     <Tooltip
-                      formatter={(value: any) => [formatFCFA(value), '']}
+                      formatter={(value: number | string) => [formatFCFA(Number(value)), '']}
                       contentStyle={{ backgroundColor: '#0f172a', borderRadius: '8px', color: '#fff' }}
                     />
                     <Legend />
@@ -299,7 +296,7 @@ export default function Dashboard() {
                       paddingAngle={5}
                       dataKey="value"
                     >
-                      {cropDistribution.map((entry, index) => (
+                      {cropDistribution.map((_entry, index) => (
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                       ))}
                     </Pie>

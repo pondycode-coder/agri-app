@@ -36,21 +36,21 @@ export const I18nProvider = ({ children }: { children: ReactNode }) => {
   const t = (key: string): string => {
     // Split the key by dots and traverse the translations object
     const keys = key.split('.');
-    let value: any = translations[locale];
+    let value: Record<string, unknown> | string = translations[locale] as Record<string, unknown>;
     for (const k of keys) {
       if (value && typeof value === 'object' && k in value) {
-        value = value[k];
+        value = value[k] as Record<string, unknown> | string;
       } else {
         // Fallback to English if not found in current locale
-        value = translations.en;
+        let fallback: Record<string, unknown> | string = translations.en as Record<string, unknown>;
         for (const k2 of keys) {
-          if (value && typeof value === 'object' && k2 in value) {
-            value = value[k2];
+          if (fallback && typeof fallback === 'object' && k2 in fallback) {
+            fallback = fallback[k2] as Record<string, unknown> | string;
           } else {
             return key; // Return the key itself if not found
           }
         }
-        break;
+        return typeof fallback === 'string' ? fallback : key;
       }
     }
     return typeof value === 'string' ? value : key;

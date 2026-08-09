@@ -348,10 +348,12 @@ class LocalDatabaseStore {
   public getTasks(): FarmTask[] { return [...this.tasks]; }
   public saveTask(taskData: Partial<FarmTask> & { id?: string; farm_id: string }): FarmTask {
     const now = new Date().toISOString();
+    const worker = taskData.worker_id ? this.workers.find((w) => w.id === taskData.worker_id) : undefined;
+    const wageAmount = taskData.wage_amount ?? worker?.daily_wage ?? 0;
+    let savedTask: FarmTask;
     if (taskData.id) {
-      this.tasks = this.tasks.map((t) => t.id === taskData.id ? { ...t, ...taskData, updated_at: now } : t);
-      this.saveAll();
-      return this.tasks.find((t) => t.id === taskData.id)!;
+      this.tasks = this.tasks.map((t) => t.id === taskData.id ? { ...t, ...taskData, wage_amount: wageAmount, updated_at: now } : t);
+      savedTask = this.tasks.find((t) => t.id === taskData.id)!;
     } else {
       const newTask: FarmTask = {
         id: 'task-' + Date.now(),
@@ -364,19 +366,54 @@ class LocalDatabaseStore {
         assigned_date: taskData.assigned_date || new Date().toISOString().split('T')[0],
         due_date: taskData.due_date || new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
         completed_date: taskData.status === 'completed' ? new Date().toISOString().split('T')[0] : null,
+        wage_amount: wageAmount,
         wage_paid: taskData.wage_paid ?? false,
         notes: taskData.notes || '',
         created_at: now,
         updated_at: now,
       };
       this.tasks.push(newTask);
-      this.saveAll();
-      return newTask;
+      savedTask = newTask;
     }
+    this.syncWageExpense(savedTask);
+    this.saveAll();
+    return savedTask;
   }
   public deleteTask(id: string) {
     this.tasks = this.tasks.filter((t) => t.id !== id);
+    this.financials = this.financials.filter((f) => f.task_id !== id);
     this.saveAll();
+  }
+
+  private syncWageExpense(task: FarmTask) {
+    if (!task.worker_id || !task.wage_amount) return;
+    const worker = this.workers.find((w) => w.id === task.worker_id);
+    const wageAmount = task.wage_amount || worker?.daily_wage || 0;
+    const existing = this.financials.find((f) => f.task_id === task.id);
+    if (task.wage_paid && task.status !== 'cancelled') {
+      if (existing) {
+        this.financials = this.financials.map((f) => f.task_id === task.id ? { ...f, amount: wageAmount, updated_at: new Date().toISOString() } : f);
+      } else {
+        const now = new Date().toISOString();
+        this.financials.push({
+          id: 'fin-task-' + task.id,
+          type: 'expense',
+          amount: wageAmount,
+          currency: 'XAF',
+          date: task.completed_date || task.due_date || now.split('T')[0],
+          description: `Salaire tâche: ${task.title}`,
+          category: 'Salaires Ouvriers',
+          farm_id: task.farm_id,
+          worker_id: task.worker_id,
+          task_id: task.id,
+          payment_method: 'cash',
+          created_at: now,
+          updated_at: now,
+        });
+      }
+    } else if (existing) {
+      this.financials = this.financials.filter((f) => f.task_id !== task.id);
+    }
   }
 
   // --- FINANCIALS ---
