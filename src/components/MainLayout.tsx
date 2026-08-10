@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useI18n } from '@/context/I18nProvider';
 import { useAuth } from '@/context/AuthProvider';
-import { hasPermission } from '@/utils/rbac';
+import { hasPermission, Resource } from '@/utils/rbac';
 import { Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -25,6 +25,8 @@ import {
   Check,
   Plus,
   Link2,
+  ServerCog,
+  type LucideIcon,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -44,7 +46,7 @@ import { AppRole } from '@/types/database';
 
 export const MainLayout = ({ children }: { children: React.ReactNode }) => {
   const { t, locale, setLocale } = useI18n();
-  const { user, signOut, switchRole, farms, activeFarmId, switchFarm, createFarm, joinFarm } = useAuth();
+  const { user, isSuperAdmin, signOut, switchRole, farms, activeFarmId, switchFarm, createFarm, joinFarm } = useAuth();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
@@ -56,7 +58,7 @@ export const MainLayout = ({ children }: { children: React.ReactNode }) => {
 
   const activeFarm = farms.find((f) => f.id === activeFarmId) || null;
 
-  const navItems = [
+  const navItems: Array<{ path: string; label: string; icon: LucideIcon; resource: Resource | 'saas-admin' }> = [
     { path: '/dashboard', label: t('layout.sidebar.dashboard'), icon: LayoutDashboard, resource: 'dashboard' as const },
     { path: '/dashboard/farms', label: t('layout.sidebar.farms'), icon: Tractor, resource: 'farms' as const },
     { path: '/dashboard/plots', label: t('layout.sidebar.plots'), icon: GridIcon, resource: 'plots' as const },
@@ -68,6 +70,9 @@ export const MainLayout = ({ children }: { children: React.ReactNode }) => {
     { path: '/dashboard/contacts', label: t('layout.sidebar.contacts'), icon: BookUser, resource: 'contacts' as const },
     { path: '/dashboard/investments', label: t('layout.sidebar.investments'), icon: TrendingUp, resource: 'investments' as const },
     { path: '/dashboard/profile', label: t('layout.sidebar.profile'), icon: UserCircle, resource: 'profile' as const },
+    ...(isSuperAdmin
+      ? [{ path: '/dashboard/saas-admin', label: 'SaaS Admin', icon: ServerCog, resource: 'saas-admin' as const }]
+      : []),
   ];
 
   const getRoleBadge = (role?: AppRole) => {
@@ -184,7 +189,9 @@ export const MainLayout = ({ children }: { children: React.ReactNode }) => {
           <nav className="p-3 space-y-1 overflow-y-auto max-h-[calc(100vh-14rem)]">
             {navItems
               .filter((item) =>
-                item.resource === 'dashboard' || hasPermission(user?.role, 'view', item.resource)
+                item.resource === 'dashboard' || item.resource === 'saas-admin'
+                  ? isSuperAdmin || item.resource === 'dashboard'
+                  : hasPermission(user?.role, 'view', item.resource as Resource)
               )
               .map((item) => {
                 const Icon = item.icon;
@@ -262,7 +269,12 @@ export const MainLayout = ({ children }: { children: React.ReactNode }) => {
               <ShieldCheck className="h-4 w-4 text-emerald-400" />
               <span className="text-xs text-slate-400">Rôle:</span>
             </div>
-            {getRoleBadge(user?.role)}
+            <div className="flex items-center space-x-1.5">
+              {user?.is_superadmin && (
+                <Badge className="bg-amber-500 text-white hover:bg-amber-600">Super Admin</Badge>
+              )}
+              {getRoleBadge(user?.role)}
+            </div>
           </div>
 
           <div className="flex items-center justify-between pt-1 border-t border-slate-800/80">

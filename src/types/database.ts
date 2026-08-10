@@ -18,8 +18,43 @@ export interface Profile {
   avatar_url?: string;
   role: AppRole;
   farm_id?: string | null;
+  is_superadmin?: boolean;
   created_at: string;
   updated_at: string;
+}
+
+// --- SaaS platform admin views ------------------------------------
+export interface AdminFarm {
+  id: string;
+  name: string;
+  location: string;
+  plots: number;
+  size_in_hectares: number;
+  users_count: number;
+  total_income: number;
+  total_expenses: number;
+  created_at: string;
+}
+
+export interface AdminUser {
+  id: string;
+  email: string;
+  name: string;
+  role: AppRole;
+  farm_id: string | null;
+  farm_name: string | null;
+  is_superadmin: boolean;
+  created_at: string;
+}
+
+export interface AdminStats {
+  total_farms: number;
+  total_users: number;
+  total_plots: number;
+  total_workers: number;
+  total_tasks: number;
+  total_income: number;
+  total_expenses: number;
 }
 
 export interface Plot {

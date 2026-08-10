@@ -1,4 +1,4 @@
-import { Farm, Profile, Plot } from '../types/database';
+import { Farm, Profile, Plot, AdminFarm, AdminUser, AdminStats } from '../types/database';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 export type EntityKey =
@@ -191,5 +191,74 @@ export class SupabaseBackend {
         status: p.status,
       } as never);
     }
+  }
+
+  // --- SaaS super-admin (platform-wide, gated server-side) ----------
+  public async isSuperAdmin(): Promise<boolean> {
+    if (!this.isConfigured()) return false;
+    const { data, error } = await supabase.rpc('is_super_admin');
+    if (error) {
+      console.error('[supabase] isSuperAdmin:', error.message);
+      return false;
+    }
+    return Boolean(data);
+  }
+
+  public async adminListFarms(): Promise<AdminFarm[]> {
+    if (!this.isConfigured()) return [];
+    const { data, error } = await supabase.rpc('admin_list_farms');
+    if (error) {
+      console.error('[supabase] adminListFarms:', error.message);
+      return [];
+    }
+    return (data || []) as AdminFarm[];
+  }
+
+  public async adminListUsers(): Promise<AdminUser[]> {
+    if (!this.isConfigured()) return [];
+    const { data, error } = await supabase.rpc('admin_list_users');
+    if (error) {
+      console.error('[supabase] adminListUsers:', error.message);
+      return [];
+    }
+    return (data || []) as AdminUser[];
+  }
+
+  public async adminStats(): Promise<AdminStats | null> {
+    if (!this.isConfigured()) return null;
+    const { data, error } = await supabase.rpc('admin_stats');
+    if (error) {
+      console.error('[supabase] adminStats:', error.message);
+      return null;
+    }
+    return (data?.[0] || null) as AdminStats | null;
+  }
+
+  public async adminSetRole(userId: string, role: string): Promise<boolean> {
+    if (!this.isConfigured()) return false;
+    const { error } = await supabase.rpc('admin_set_role', { p_user_id: userId, p_role: role } as never);
+    if (error) console.error('[supabase] adminSetRole:', error.message);
+    return !error;
+  }
+
+  public async adminSetSuperadmin(userId: string, active: boolean): Promise<boolean> {
+    if (!this.isConfigured()) return false;
+    const { error } = await supabase.rpc('admin_set_superadmin', { p_user_id: userId, p_active: active } as never);
+    if (error) console.error('[supabase] adminSetSuperadmin:', error.message);
+    return !error;
+  }
+
+  public async adminDeleteFarm(farmId: string): Promise<boolean> {
+    if (!this.isConfigured()) return false;
+    const { error } = await supabase.rpc('admin_delete_farm', { p_farm_id: farmId } as never);
+    if (error) console.error('[supabase] adminDeleteFarm:', error.message);
+    return !error;
+  }
+
+  public async adminMoveUser(userId: string, farmId: string): Promise<boolean> {
+    if (!this.isConfigured()) return false;
+    const { error } = await supabase.rpc('admin_move_user', { p_user_id: userId, p_farm_id: farmId } as never);
+    if (error) console.error('[supabase] adminMoveUser:', error.message);
+    return !error;
   }
 }

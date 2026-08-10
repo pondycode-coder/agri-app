@@ -1,6 +1,6 @@
 import { SupabaseBackend } from './supabaseBackend';
 import { dbStore } from '../services/store';
-import { Profile, Farm } from '../types/database';
+import { Profile, Farm, AdminFarm, AdminUser, AdminStats, AppRole } from '../types/database';
 import {
   INITIAL_FARMS,
   INITIAL_PLOTS,
@@ -111,4 +111,47 @@ export function detachFarm(): void {
 
 export function getActiveBackend(): SupabaseBackend | null {
   return activeBackend;
+}
+
+// --- SaaS super-admin helpers -------------------------------------
+// All delegate to Supabase RPCs that gate on is_super_admin() server-side.
+
+export async function isCurrentUserSuperAdmin(): Promise<boolean> {
+  if (!activeBackend?.isConfigured()) return false;
+  return activeBackend.isSuperAdmin();
+}
+
+export async function adminListFarms(): Promise<AdminFarm[]> {
+  if (!activeBackend?.isConfigured()) return [];
+  return activeBackend.adminListFarms();
+}
+
+export async function adminListUsers(): Promise<AdminUser[]> {
+  if (!activeBackend?.isConfigured()) return [];
+  return activeBackend.adminListUsers();
+}
+
+export async function adminStats(): Promise<AdminStats | null> {
+  if (!activeBackend?.isConfigured()) return null;
+  return activeBackend.adminStats();
+}
+
+export async function adminSetRole(userId: string, role: AppRole): Promise<boolean> {
+  if (!activeBackend?.isConfigured()) return false;
+  return activeBackend.adminSetRole(userId, role);
+}
+
+export async function adminSetSuperadmin(userId: string, active: boolean): Promise<boolean> {
+  if (!activeBackend?.isConfigured()) return false;
+  return activeBackend.adminSetSuperadmin(userId, active);
+}
+
+export async function adminDeleteFarm(farmId: string): Promise<boolean> {
+  if (!activeBackend?.isConfigured()) return false;
+  return activeBackend.adminDeleteFarm(farmId);
+}
+
+export async function adminMoveUser(userId: string, farmId: string): Promise<boolean> {
+  if (!activeBackend?.isConfigured()) return false;
+  return activeBackend.adminMoveUser(userId, farmId);
 }

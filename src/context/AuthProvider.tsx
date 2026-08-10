@@ -9,6 +9,7 @@ interface AuthContextType {
   loading: boolean;
   farms: Farm[];
   activeFarmId: string | null;
+  isSuperAdmin: boolean;
   signIn: (email: string, password?: string) => Promise<void>;
   signUp: (email: string, password?: string, name?: string, role?: AppRole) => Promise<void>;
   signOut: () => Promise<void>;
@@ -231,6 +232,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         loading,
         farms,
         activeFarmId,
+        isSuperAdmin: user?.is_superadmin === true,
         signIn,
         signUp,
         signOut,

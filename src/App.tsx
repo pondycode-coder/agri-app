@@ -21,6 +21,7 @@ import Financials from "./pages/Financials";
 import Contacts from "./pages/Contacts";
 import Investments from "./pages/Investments";
 import Profile from "./pages/Profile";
+import SaasAdmin from "./pages/SaasAdmin";
 import { useAuth } from "./context/AuthProvider";
 import { RoleGuard } from "./components/RoleGuard";
 
@@ -59,6 +60,7 @@ const App = () => (
             <Route path="/dashboard/contacts" element={<PrivateRoute><RoleGuard resource="contacts"><Contacts /></RoleGuard></PrivateRoute>} />
             <Route path="/dashboard/investments" element={<PrivateRoute><RoleGuard resource="investments"><Investments /></RoleGuard></PrivateRoute>} />
             <Route path="/dashboard/profile" element={<PrivateRoute><RoleGuard resource="profile"><Profile /></RoleGuard></PrivateRoute>} />
+            <Route path="/dashboard/saas-admin" element={<PrivateRoute><SaasAdmin /></PrivateRoute>} />
             {/* Home route - redirect to dashboard if authenticated, else to login */}
             <Route
               path="/"
