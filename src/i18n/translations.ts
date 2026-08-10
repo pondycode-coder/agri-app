@@ -6,7 +6,7 @@ export const translations = {
     layout: {
       header: {
         title: 'AgriApp',
-        subtitle: 'Gestion Agricole Cameroun',
+        subtitle: 'Gestion Agricole Moderne',
         dashboard: 'Tableau de bord',
         farms: 'Fermes',
         plots: 'Parcelles',
@@ -45,16 +45,16 @@ export const translations = {
       resetPassword: 'Réinitialiser le mot de passe',
       sendResetLink: 'Envoyer le lien',
       backToSignIn: 'Retour à la connexion',
-      demoLoginNotice: 'Accès Rapide Démo (Cameroun)',
+      demoLoginNotice: 'Accès Rapide Démo',
       loginAsAdmin: 'Administrateur (Propriétaire)',
       loginAsManager: 'Gestionnaire de Ferme',
       loginAsWorker: 'Ouvrier / Technicien',
-      tagline: 'Plateforme complète de gestion pour exploitations agricoles au Cameroun (XAF / FCFA)',
+      tagline: 'Plateforme complète de gestion agricole moderne (XAF / FCFA)',
     },
     // Dashboard Overview
     dashboard: {
       title: 'Tableau de bord Analytique',
-      welcome: 'Bienvenue sur AgriApp Cameroun',
+      welcome: 'Bienvenue sur AgriApp',
       subtitle: 'Vue d\'ensemble temps réel de vos exploitations agricoles',
       totalFarms: 'Fermes Exploiteés',
       totalPlots: 'Parcelles Actives',
@@ -62,6 +62,10 @@ export const translations = {
       totalWorkers: 'Effectif Ouvriers',
       pendingTasks: 'Tâches en Attente',
       inventoryValue: 'Valeur Stock Intrants',
+      totalWagesPaid: 'Salaires Payés',
+      totalOutstandingWages: 'Salaires Restants à Payer',
+      paidWagesDetail: 'Somme des tâches marquées payées',
+      outstandingWagesDetail: 'Somme des tâches non payées',
       monthlyIncome: 'Entrées du Mois (FCFA)',
       monthlyExpenses: 'Sorties du Mois (FCFA)',
       netCashFlow: 'Résultat Net (FCFA)',
@@ -77,7 +81,7 @@ export const translations = {
     // Farms Module
     farms: {
       title: 'Gestion des Fermes',
-      subtitle: 'Répertoire de vos exploitations agricoles à travers le Cameroun',
+      subtitle: 'Répertoire de vos exploitations agricoles',
       addFarm: 'Créer une Ferme',
       editFarm: 'Modifier la Ferme',
       name: 'Nom de la Ferme',
@@ -85,7 +89,7 @@ export const translations = {
       hectares: 'Superficie Total (ha)',
       plotsCount: 'Nombre de Parcelles',
       description: 'Description de l\'Exploitation',
-      locationPlaceholder: 'ex: Bafoussam, Ouest Cameroun',
+      locationPlaceholder: 'ex: Bafoussam, Ouest',
     },
     // Plots Module
     plots: {
@@ -149,13 +153,12 @@ export const translations = {
     // Workers Module
     workers: {
       title: 'Effectif des Ouvriers & Techniciens',
-      subtitle: 'Suivi de la main d\'œuvre, salaires journaliers et productivité',
+      subtitle: 'Suivi de la main d\'œuvre et productivité',
       addWorker: 'Enregistrer un Ouvrier',
       editWorker: 'Modifier les Infos',
       name: 'Nom Complêt',
       role: 'Poste / Qualification',
       phone: 'Téléphone WhatsApp',
-      dailyWage: 'Salaire Journalier (FCFA)',
       productivity: 'Note de Productivité',
       tasksCompleted: 'Tâches Accomplies',
       status: 'État',
@@ -180,6 +183,7 @@ export const translations = {
       assignedDate: 'Date d\'Assignment',
       dueDate: 'Date Limite',
       completedDate: 'Date d\'Achevement',
+      wageAmount: 'Montant Salaire (FCFA)',
       wagePaid: 'Main d\'œuvre Payée',
       paid: 'Payé',
       unpaid: 'Non Payé',
@@ -294,7 +298,7 @@ export const translations = {
     layout: {
       header: {
         title: 'AgriApp',
-        subtitle: 'Cameroon Farm Management',
+        subtitle: 'Farm Management',
         dashboard: 'Dashboard',
         farms: 'Farms',
         plots: 'Plots',
@@ -333,16 +337,16 @@ export const translations = {
       resetPassword: 'Reset Password',
       sendResetLink: 'Send Link',
       backToSignIn: 'Back to Sign In',
-      demoLoginNotice: 'Quick Demo Access (Cameroon)',
+      demoLoginNotice: 'Quick Demo Access',
       loginAsAdmin: 'Administrator (Farm Owner)',
       loginAsManager: 'Farm Manager',
       loginAsWorker: 'Field Worker / Technician',
-      tagline: 'Complete farm management platform for Cameroonian agribusinesses (XAF / FCFA)',
+      tagline: 'Complete farm management platform for modern agribusinesses (XAF / FCFA)',
     },
     // Dashboard Overview
     dashboard: {
       title: 'Analytical Dashboard',
-      welcome: 'Welcome to AgriApp Cameroon',
+      welcome: 'Welcome to AgriApp',
       subtitle: 'Real-time overview of your farm operations',
       totalFarms: 'Managed Farms',
       totalPlots: 'Active Plots',
@@ -350,6 +354,10 @@ export const translations = {
       totalWorkers: 'Worker Force',
       pendingTasks: 'Pending Tasks',
       inventoryValue: 'Stock Value',
+      totalWagesPaid: 'Wages Paid',
+      totalOutstandingWages: 'Outstanding Wages',
+      paidWagesDetail: 'Sum of tasks marked paid',
+      outstandingWagesDetail: 'Sum of tasks not yet paid',
       monthlyIncome: 'Monthly Income (FCFA)',
       monthlyExpenses: 'Monthly Expenses (FCFA)',
       netCashFlow: 'Net Profit (FCFA)',
@@ -365,7 +373,7 @@ export const translations = {
     // Farms Module
     farms: {
       title: 'Farm Management',
-      subtitle: 'Directory of your farm locations across Cameroon',
+      subtitle: 'Directory of your farm locations',
       addFarm: 'Create Farm',
       editFarm: 'Edit Farm',
       name: 'Farm Name',
@@ -437,13 +445,12 @@ export const translations = {
     // Workers Module
     workers: {
       title: 'Worker Roster & Staff',
-      subtitle: 'Labor tracking, daily wage in FCFA and productivity score',
+      subtitle: 'Labor tracking and productivity score',
       addWorker: 'Register Worker',
       editWorker: 'Edit Worker Details',
       name: 'Full Name',
       role: 'Role / Job Title',
       phone: 'WhatsApp Phone',
-      dailyWage: 'Daily Wage (FCFA)',
       productivity: 'Productivity Rating',
       tasksCompleted: 'Tasks Completed',
       status: 'Status',
@@ -468,6 +475,7 @@ export const translations = {
       assignedDate: 'Assigned Date',
       dueDate: 'Due Date',
       completedDate: 'Completion Date',
+      wageAmount: 'Wage Amount (FCFA)',
       wagePaid: 'Labor Paid',
       paid: 'Paid',
       unpaid: 'Unpaid',

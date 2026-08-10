@@ -22,6 +22,7 @@ import Contacts from "./pages/Contacts";
 import Investments from "./pages/Investments";
 import Profile from "./pages/Profile";
 import { useAuth } from "./context/AuthProvider";
+import { RoleGuard } from "./components/RoleGuard";
 
 // Private route component
 const PrivateRoute = ({ children }: { children: React.ReactElement }) => {
@@ -48,16 +49,16 @@ const App = () => (
             <Route path="/forgot-password" element={<ForgotPassword />} />
             {/* Protected routes */}
             <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
-            <Route path="/dashboard/farms" element={<PrivateRoute><Farms /></PrivateRoute>} />
-            <Route path="/dashboard/plots" element={<PrivateRoute><Plots /></PrivateRoute>} />
-            <Route path="/dashboard/crops" element={<PrivateRoute><CropCycles /></PrivateRoute>} />
-            <Route path="/dashboard/inventory" element={<PrivateRoute><Inventory /></PrivateRoute>} />
-            <Route path="/dashboard/workers" element={<PrivateRoute><Workers /></PrivateRoute>} />
-            <Route path="/dashboard/tasks" element={<PrivateRoute><Tasks /></PrivateRoute>} />
-            <Route path="/dashboard/financials" element={<PrivateRoute><Financials /></PrivateRoute>} />
-            <Route path="/dashboard/contacts" element={<PrivateRoute><Contacts /></PrivateRoute>} />
-            <Route path="/dashboard/investments" element={<PrivateRoute><Investments /></PrivateRoute>} />
-            <Route path="/dashboard/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
+            <Route path="/dashboard/farms" element={<PrivateRoute><RoleGuard resource="farms"><Farms /></RoleGuard></PrivateRoute>} />
+            <Route path="/dashboard/plots" element={<PrivateRoute><RoleGuard resource="plots"><Plots /></RoleGuard></PrivateRoute>} />
+            <Route path="/dashboard/crops" element={<PrivateRoute><RoleGuard resource="crops"><CropCycles /></RoleGuard></PrivateRoute>} />
+            <Route path="/dashboard/inventory" element={<PrivateRoute><RoleGuard resource="inventory"><Inventory /></RoleGuard></PrivateRoute>} />
+            <Route path="/dashboard/workers" element={<PrivateRoute><RoleGuard resource="workers"><Workers /></RoleGuard></PrivateRoute>} />
+            <Route path="/dashboard/tasks" element={<PrivateRoute><RoleGuard resource="tasks"><Tasks /></RoleGuard></PrivateRoute>} />
+            <Route path="/dashboard/financials" element={<PrivateRoute><RoleGuard resource="financials"><Financials /></RoleGuard></PrivateRoute>} />
+            <Route path="/dashboard/contacts" element={<PrivateRoute><RoleGuard resource="contacts"><Contacts /></RoleGuard></PrivateRoute>} />
+            <Route path="/dashboard/investments" element={<PrivateRoute><RoleGuard resource="investments"><Investments /></RoleGuard></PrivateRoute>} />
+            <Route path="/dashboard/profile" element={<PrivateRoute><RoleGuard resource="profile"><Profile /></RoleGuard></PrivateRoute>} />
             {/* Home route - redirect to dashboard if authenticated, else to login */}
             <Route
               path="/"

@@ -36,7 +36,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const profiles = dbStore.getProfiles();
     return profiles[0] || {
       id: 'user-admin-1',
-      email: 'admin@agriapp.cm',
+      email: 'admin@agriapp.com',
       name: 'Jean-Paul Nkoumou',
       role: 'admin',
       farm_id: 'farm-1',

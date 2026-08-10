@@ -28,7 +28,7 @@ export default function Workers() {
   const [farms, setFarms] = useState<ReturnType<typeof dbStore.getFarms>>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Worker | null>(null);
-  const [form, setForm] = useState({ farm_id: '', name: '', role: 'field_worker' as Worker['role'], phone_number: '', daily_wage: 3500 });
+  const [form, setForm] = useState({ farm_id: '', name: '', role: 'field_worker' as Worker['role'], phone_number: '' });
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -42,13 +42,13 @@ export default function Workers() {
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ farm_id: farms[0]?.id || '', name: '', role: 'field_worker', phone_number: '', daily_wage: 3500 });
+    setForm({ farm_id: farms[0]?.id || '', name: '', role: 'field_worker', phone_number: '' });
     setDialogOpen(true);
   };
 
   const openEdit = (w: Worker) => {
     setEditing(w);
-    setForm({ farm_id: w.farm_id, name: w.name, role: w.role, phone_number: w.phone_number, daily_wage: w.daily_wage });
+    setForm({ farm_id: w.farm_id, name: w.name, role: w.role, phone_number: w.phone_number });
     setDialogOpen(true);
   };
 
@@ -82,7 +82,6 @@ export default function Workers() {
                   <TableHead>{t('workers.name')}</TableHead>
                   <TableHead>{t('workers.role')}</TableHead>
                   <TableHead>{t('workers.phone')}</TableHead>
-                  <TableHead>{t('workers.dailyWage')}</TableHead>
                   <TableHead>{t('workers.tasksCompleted')}</TableHead>
                   <TableHead>{t('workers.status')}</TableHead>
                   <TableHead className="text-right">{t('common.actions')}</TableHead>
@@ -96,7 +95,6 @@ export default function Workers() {
                     <TableCell className="font-medium">{w.name}</TableCell>
                     <TableCell><Badge variant="secondary">{roleLabels[w.role] || w.role}</Badge></TableCell>
                     <TableCell>{w.phone_number}</TableCell>
-                    <TableCell>{formatFCFA(w.daily_wage)}</TableCell>
                     <TableCell>{w.total_tasks_completed}</TableCell>
                     <TableCell><Badge className={w.is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}>{w.is_active ? t('workers.active') : t('workers.inactive')}</Badge></TableCell>
                     <TableCell className="text-right space-x-2">
@@ -137,9 +135,8 @@ export default function Workers() {
                   </Select>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4">
                 <div><Label>{t('workers.phone')}</Label><Input value={form.phone_number} onChange={(e) => setForm({ ...form, phone_number: e.target.value })} placeholder="+237 6XX XXX XXX" /></div>
-                <div><Label>{t('workers.dailyWage')}</Label><Input type="number" min={0} value={form.daily_wage} onChange={(e) => setForm({ ...form, daily_wage: parseInt(e.target.value) || 0 })} /></div>
               </div>
             </div>
             <DialogFooter>

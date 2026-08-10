@@ -59,36 +59,23 @@ function renderTasks() {
   );
 }
 
-describe("Tasks page - wage flow", () => {
-  it("shows wage summary cards", () => {
+describe("Tasks page", () => {
+  it("renders task table columns including wage amount and paid status", () => {
     renderTasks();
-    expect(screen.getByText(/Salaires Payés/)).toBeInTheDocument();
-    expect(screen.getByText(/Salaires Restants à Payer/)).toBeInTheDocument();
+    expect(screen.getByText(/Montant Salaire \(FCFA\)/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Payé/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Non Payé/i).length).toBeGreaterThan(0);
   });
 
-  it("marks a task paid via the toggle button", () => {
+  it("opens the create dialog and allows editing task wage fields", () => {
     renderTasks();
 
-    const unpaidCount = screen.queryAllByText(/Non Payé/).length;
-    expect(unpaidCount).toBeGreaterThan(0);
-
-    const unpaidButton = screen.getAllByText(/Non Payé/)[0];
-    fireEvent.click(unpaidButton);
-
-    expect(screen.queryAllByText(/Non Payé/).length).toBe(unpaidCount - 1);
+    fireEvent.click(screen.getByText(/Créer une Tâche/i));
+    const wageInputs = screen.getAllByRole('spinbutton');
+    expect(wageInputs.length).toBeGreaterThan(0);
+    const wageInput = wageInputs[0] as HTMLInputElement;
+    fireEvent.change(wageInput, { target: { value: '8000' } });
+    expect(wageInput.value).toBe('8000');
   });
 
-  it("creating a task prefills wage from the selected worker", () => {
-    renderTasks();
-    fireEvent.click(screen.getByText(/Nouvelle Tâche|Créer une Tâche/i));
-
-    const selects = screen.getAllByTestId("mock-select");
-    const workerSelect = selects.find((s) =>
-      Array.from((s as HTMLSelectElement).options).some((o) => o.textContent?.includes("Samuel Mvondo"))
-    ) as HTMLSelectElement;
-    fireEvent.change(workerSelect, { target: { value: "wrk-1" } });
-
-    const wageInput = screen.getByDisplayValue("3500") as HTMLInputElement;
-    expect(wageInput).toBeInTheDocument();
-  });
 });

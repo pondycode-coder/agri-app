@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useI18n } from '@/context/I18nProvider';
 import { useAuth } from '@/context/AuthProvider';
+import { hasPermission } from '@/utils/rbac';
 import { Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -38,17 +39,17 @@ export const MainLayout = ({ children }: { children: React.ReactNode }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const navItems = [
-    { path: '/dashboard', label: t('layout.sidebar.dashboard'), icon: LayoutDashboard },
-    { path: '/dashboard/farms', label: t('layout.sidebar.farms'), icon: Tractor },
-    { path: '/dashboard/plots', label: t('layout.sidebar.plots'), icon: GridIcon },
-    { path: '/dashboard/crops', label: t('layout.sidebar.crops'), icon: Sprout },
-    { path: '/dashboard/inventory', label: t('layout.sidebar.inventory'), icon: Package },
-    { path: '/dashboard/workers', label: t('layout.sidebar.workers'), icon: Users },
-    { path: '/dashboard/tasks', label: t('layout.sidebar.tasks'), icon: CheckSquare },
-    { path: '/dashboard/financials', label: t('layout.sidebar.financials'), icon: Receipt },
-    { path: '/dashboard/contacts', label: t('layout.sidebar.contacts'), icon: BookUser },
-    { path: '/dashboard/investments', label: t('layout.sidebar.investments'), icon: TrendingUp },
-    { path: '/dashboard/profile', label: t('layout.sidebar.profile'), icon: UserCircle },
+    { path: '/dashboard', label: t('layout.sidebar.dashboard'), icon: LayoutDashboard, resource: 'dashboard' as const },
+    { path: '/dashboard/farms', label: t('layout.sidebar.farms'), icon: Tractor, resource: 'farms' as const },
+    { path: '/dashboard/plots', label: t('layout.sidebar.plots'), icon: GridIcon, resource: 'plots' as const },
+    { path: '/dashboard/crops', label: t('layout.sidebar.crops'), icon: Sprout, resource: 'crops' as const },
+    { path: '/dashboard/inventory', label: t('layout.sidebar.inventory'), icon: Package, resource: 'inventory' as const },
+    { path: '/dashboard/workers', label: t('layout.sidebar.workers'), icon: Users, resource: 'workers' as const },
+    { path: '/dashboard/tasks', label: t('layout.sidebar.tasks'), icon: CheckSquare, resource: 'tasks' as const },
+    { path: '/dashboard/financials', label: t('layout.sidebar.financials'), icon: Receipt, resource: 'financials' as const },
+    { path: '/dashboard/contacts', label: t('layout.sidebar.contacts'), icon: BookUser, resource: 'contacts' as const },
+    { path: '/dashboard/investments', label: t('layout.sidebar.investments'), icon: TrendingUp, resource: 'investments' as const },
+    { path: '/dashboard/profile', label: t('layout.sidebar.profile'), icon: UserCircle, resource: 'profile' as const },
   ];
 
   const getRoleBadge = (role?: AppRole) => {
@@ -75,8 +76,8 @@ export const MainLayout = ({ children }: { children: React.ReactNode }) => {
           <span className="font-bold text-lg text-slate-900 dark:text-white">
             Agri<span className="text-emerald-600">App</span>
           </span>
-          <span className="text-xs bg-red-100 text-red-800 font-semibold px-1.5 py-0.5 rounded border border-red-200">
-            🇨🇲 XAF
+          <span className="text-xs bg-slate-100 text-slate-700 font-semibold px-1.5 py-0.5 rounded border border-slate-200">
+            XAF
           </span>
         </div>
         <Button
@@ -105,12 +106,12 @@ export const MainLayout = ({ children }: { children: React.ReactNode }) => {
               <div>
                 <div className="font-extrabold text-lg text-white leading-tight flex items-center gap-1.5">
                   Agri<span className="text-emerald-400">App</span>
-                  <span className="text-[10px] bg-red-600 text-white font-bold px-1 py-0.2 rounded">
-                    CM
+                  <span className="text-[10px] bg-emerald-300 text-slate-900 font-bold px-1 py-0.2 rounded">
+                    AG
                   </span>
                 </div>
                 <div className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">
-                  Cameroon Agribusiness
+                  Agribusiness Management
                 </div>
               </div>
             </Link>
@@ -118,32 +119,36 @@ export const MainLayout = ({ children }: { children: React.ReactNode }) => {
 
           {/* Navigation Links */}
           <nav className="p-3 space-y-1 overflow-y-auto max-h-[calc(100vh-14rem)]">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = location.pathname === item.path;
-              return (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={`
-                    flex items-center px-3.5 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 group
-                    ${
-                      isActive
-                        ? 'bg-emerald-600 text-white shadow-md shadow-emerald-900/30 font-semibold'
-                        : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-                    }
-                  `}
-                >
-                  <Icon
-                    className={`mr-3 h-4 w-4 transition-transform group-hover:scale-110 ${
-                      isActive ? 'text-white' : 'text-slate-400 group-hover:text-emerald-400'
-                    }`}
-                  />
-                  <span>{item.label}</span>
-                </Link>
-              );
-            })}
+            {navItems
+              .filter((item) =>
+                item.resource === 'dashboard' || hasPermission(user?.role, 'view', item.resource)
+              )
+              .map((item) => {
+                const Icon = item.icon;
+                const isActive = location.pathname === item.path;
+                return (
+                  <Link
+                    key={item.path}
+                    to={item.path}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={`
+                      flex items-center px-3.5 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 group
+                      ${
+                        isActive
+                          ? 'bg-emerald-600 text-white shadow-md shadow-emerald-900/30 font-semibold'
+                          : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                      }
+                    `}
+                  >
+                    <Icon
+                      className={`mr-3 h-4 w-4 transition-transform group-hover:scale-110 ${
+                        isActive ? 'text-white' : 'text-slate-400 group-hover:text-emerald-400'
+                      }`}
+                    />
+                    <span>{item.label}</span>
+                  </Link>
+                );
+              })}
           </nav>
         </div>
 
@@ -215,7 +220,7 @@ export const MainLayout = ({ children }: { children: React.ReactNode }) => {
         <header className="hidden md:flex h-16 items-center justify-between bg-white dark:bg-slate-900 border-b px-8 shadow-sm">
           <div className="flex items-center space-x-3">
             <Badge variant="outline" className="border-emerald-600/30 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 font-semibold px-2.5 py-1">
-              🇨🇲 Cameroun — XAF / FCFA
+              XAF / FCFA
             </Badge>
             <span className="text-slate-400 text-sm">|</span>
             <span className="text-sm font-medium text-slate-600 dark:text-slate-400">

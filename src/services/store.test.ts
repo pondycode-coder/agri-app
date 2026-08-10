@@ -6,16 +6,18 @@ beforeEach(() => {
 });
 
 describe("LocalDatabaseStore - Tasks & Wages", () => {
-  it("computes wage_amount from the worker's daily wage on creation", () => {
-    const worker = dbStore.getWorkers().find((w) => w.id === "wrk-1")!;
+  it("creates a task with the provided wage_amount and preserves task-level wages", () => {
     const task = dbStore.saveTask({
       farm_id: "farm-1",
-      worker_id: worker.id,
+      worker_id: "wrk-1",
       title: "Désherbage",
       status: "pending",
+      wage_amount: 4200,
     });
 
-    expect(task.wage_amount).toBe(worker.daily_wage);
+    expect(task.wage_amount).toBe(4200);
+    expect(task.wage_paid).toBe(false);
+    expect(task.worker_id).toBe("wrk-1");
   });
 
   it("creates a Salaires Ouvriers expense when a task is marked paid", () => {

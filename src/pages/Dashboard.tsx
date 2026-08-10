@@ -67,6 +67,14 @@ export default function Dashboard() {
   // Low Stock Items
   const lowStockItems = inventory.filter((item) => item.quantity <= 10);
 
+  const totalWagesPaid = tasks
+    .filter((t) => t.wage_paid)
+    .reduce((sum, task) => sum + (task.wage_amount || 0), 0);
+
+  const totalWagesPending = tasks
+    .filter((t) => !t.wage_paid)
+    .reduce((sum, task) => sum + (task.wage_amount || 0), 0);
+
   // Financial Chart Data
   const chartData = [
     { name: 'Novembre', Recettes: 4800000, Dépenses: 350000 },
@@ -95,7 +103,7 @@ export default function Dashboard() {
           <div className="relative z-10 space-y-2">
             <div className="flex items-center space-x-2">
               <Badge className="bg-yellow-400 text-slate-900 font-extrabold hover:bg-yellow-300">
-                🇨🇲 Cameroun XAF
+                XAF / FCFA
               </Badge>
               <span className="text-xs text-emerald-200">Système de Gestion Agricole</span>
             </div>
@@ -174,6 +182,42 @@ export default function Dashboard() {
               </div>
               <p className="text-xs text-slate-500 mt-1">
                 {inventory.length} références d'intrants
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Card className="border-l-4 border-l-emerald-500 shadow-sm">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                {t('dashboard.totalWagesPaid')}
+              </CardTitle>
+              <DollarSign className="h-5 w-5 text-emerald-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-slate-900 dark:text-white">
+                {formatFCFA(totalWagesPaid)}
+              </div>
+              <p className="text-xs text-slate-500 mt-1">
+                {t('dashboard.paidWagesDetail')}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-l-4 border-l-amber-500 shadow-sm">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                {t('dashboard.totalOutstandingWages')}
+              </CardTitle>
+              <AlertTriangle className="h-5 w-5 text-amber-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-slate-900 dark:text-white">
+                {formatFCFA(totalWagesPending)}
+              </div>
+              <p className="text-xs text-slate-500 mt-1">
+                {t('dashboard.outstandingWagesDetail')}
               </p>
             </CardContent>
           </Card>

@@ -23,7 +23,7 @@ export default function Profile() {
 
   const isSupabaseConfigured = !!(import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY);
 
-  const MIGRATION_SQL = `-- AgriApp Cameroon - Initial Schema
+  const MIGRATION_SQL = `-- AgriApp AgriApp - Initial Schema
 CREATE TYPE app_role AS ENUM ('admin', 'manager', 'worker');
 
 CREATE TABLE profiles (
@@ -122,7 +122,7 @@ ALTER TABLE crop_cycles ENABLE ROW LEVEL SECURITY;`;
                 </div>
                 <div>
                   <p className="text-lg font-bold">{user?.name || 'Utilisateur Agri'}</p>
-                  <p className="text-sm text-slate-500">{user?.email || 'admin@agriapp.cm'}</p>
+                  <p className="text-sm text-slate-500">{user?.email || 'admin@agriapp.com'}</p>
                 </div>
               </div>
               <div className="pt-2 border-t">

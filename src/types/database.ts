@@ -83,28 +83,30 @@ export interface Worker {
   name: string;
   role: 'field_worker' | 'agronomist' | 'machine_operator' | 'supervisor';
   phone_number: string;
-  daily_wage: number; // in FCFA
   farm_id: string;
   is_active: boolean;
   total_tasks_completed: number;
-  productivity_score: number; // 1 to 5 or percentage
+  productivity_score: number; // 1 to 5
   created_at: string;
   updated_at: string;
 }
 
 export interface FarmTask {
   id: string;
+  /** Primary multi-worker assignment array */
+  worker_ids?: string[];
+  /** Legacy single-worker fallback for backwards compatibility */
   worker_id?: string | null;
   title: string;
   description?: string;
   farm_id: string;
   plot_id?: string | null;
+  wage_amount?: number;
+  wage_paid?: boolean;
   status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
   assigned_date: string;
   due_date: string;
   completed_date?: string | null;
-  wage_amount?: number | null;
-  wage_paid: boolean;
   notes?: string;
   created_at: string;
   updated_at: string;
@@ -117,7 +119,7 @@ export interface FinancialRecord {
   currency: 'XAF';
   date: string;
   description: string;
-  category: string; // 'Crop Sales', 'Worker Wage', 'Fertilizer Purchase', 'Fuel', 'Equipment', 'Other'
+  category: string; // 'Crop Sales', 'Labor & Wages', 'Fertilizer Purchase', 'Fuel', 'Equipment', 'Other'
   farm_id: string;
   worker_id?: string | null;
   task_id?: string | null;
@@ -143,7 +145,18 @@ export interface Investment {
   updated_at: string;
 }
 
-/** Utility function to format monetary amounts in Cameroonian FCFA / XAF */
+/** Utility helper to extract assigned worker IDs from a task */
+export function getTaskWorkerIds(task: FarmTask): string[] {
+  if (task.worker_ids && task.worker_ids.length > 0) {
+    return task.worker_ids;
+  }
+  if (task.worker_id) {
+    return [task.worker_id];
+  }
+  return [];
+}
+
+/** Utility function to format monetary amounts in FCFA / XAF */
 export function formatFCFA(amount: number): string {
   if (isNaN(amount) || amount === null || amount === undefined) return '0 FCFA';
   return new Intl.NumberFormat('fr-CM', {
