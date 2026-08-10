@@ -1,0 +1,108 @@
+import { SupabaseBackend } from './supabaseBackend';
+import { dbStore } from '../services/store';
+import { Profile, Farm } from '../types/database';
+import {
+  INITIAL_FARMS,
+  INITIAL_PLOTS,
+} from '../services/mockData';
+
+let activeBackend: SupabaseBackend | null = null;
+let activeUser: Profile | null = null;
+
+/**
+ * Activate the Supabase tenant for a signed-in user.
+ * - attaches the remote mirror to the local cache store
+ * - seeds the tenant's first farm if none exists yet
+ * - adds the user to that farm (user_farms) if needed
+ * - hydrates the cache with the farm's live data
+ *
+ * Falls back gracefully (no-op) when Supabase is not configured.
+ */
+export async function activateFarm(profile: Profile): Promise<void> {
+  if (!profile.farm_id) return;
+
+  const backend = new SupabaseBackend(profile.farm_id);
+  activeBackend = backend;
+  activeUser = profile;
+
+  if (backend.isConfigured()) {
+    const firstFarm = INITIAL_FARMS[0];
+    await backend.seedFarmIfEmpty(firstFarm, INITIAL_PLOTS.filter((p) => p.farm_id === firstFarm.id));
+    await backend.ensureMembership(profile.id, profile.farm_id);
+    await backend.bindProfileToFarm(profile);
+  }
+
+  dbStore.attachRemote(backend);
+  if (backend.isConfigured()) {
+    await dbStore.hydrateFromRemote(profile.farm_id);
+  }
+}
+
+export async function listUserFarms(): Promise<Farm[]> {
+  if (!activeBackend?.isConfigured()) return [];
+  return activeBackend.listMyFarms();
+}
+
+/** Create a farm owned by the current user and switch to it. */
+export async function createFarmAndSwitch(
+  data: { name: string; location?: string; size_in_hectares?: number; description?: string },
+): Promise<Farm | null> {
+  if (!activeUser) return null;
+
+  if (activeBackend?.isConfigured()) {
+    const created = await activeBackend.createFarm(data);
+    if (!created) return null;
+    await switchFarm(created.id);
+    return created;
+  }
+
+  // Local/demo mode: persist through the cache store.
+  const created = dbStore.saveFarm({
+    name: data.name,
+    location: data.location || 'Cameroun',
+    size_in_hectares: data.size_in_hectares || 1,
+    description: data.description || '',
+  });
+  await switchFarm(created.id);
+  return created;
+}
+
+/** Join an existing farm by id and switch to it. Returns null if not found. */
+export async function joinFarmAndSwitch(farmId: string): Promise<Farm | null> {
+  if (!activeUser) return null;
+
+  if (activeBackend?.isConfigured()) {
+    const joined = await activeBackend.joinFarm(farmId);
+    if (!joined) return null;
+    await switchFarm(joined.id);
+    return joined;
+  }
+
+  // Local/demo mode: look the farm up in the cache store.
+  const target = dbStore.getFarms().find((f) => f.id === farmId);
+  if (!target) return null;
+  await switchFarm(target.id);
+  return target;
+}
+
+/** Switch the active tenant; re-hydrates the cache for the chosen farm. */
+export async function switchFarm(farmId: string): Promise<void> {
+  if (!activeBackend || !activeUser) return;
+  activeBackend.farmId = farmId;
+  if (activeBackend.isConfigured()) {
+    await dbStore.hydrateFromRemote(farmId);
+  } else {
+    dbStore.hydrateLocal(farmId);
+  }
+  await activeBackend.ensureMembership(activeUser.id, farmId);
+}
+
+export function detachFarm(): void {
+  activeBackend = null;
+  activeUser = null;
+  dbStore.attachRemote(null);
+}
+
+export function getActiveBackend(): SupabaseBackend | null {
+  return activeBackend;
+}

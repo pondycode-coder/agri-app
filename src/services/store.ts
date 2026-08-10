@@ -22,11 +22,100 @@ import {
   INITIAL_FINANCIALS,
   INITIAL_INVESTMENTS,
 } from './mockData';
+import { SupabaseBackend, EntityKey } from '../lib/supabaseBackend';
 
 type Listener = () => void;
 
 class LocalDatabaseStore {
   private listeners: Set<Listener> = new Set();
+
+  /**
+   * Optional Supabase mirror. When attached, every mutation is mirrored to
+   * Supabase (fire-and-forget) and the cache can be re-hydrated from the
+   * tenant's live data. localStorage stays the fast cache + offline fallback.
+   */
+  private remote: SupabaseBackend | null = null;
+  private remoteQueue: Promise<void> = Promise.resolve();
+
+  public attachRemote(backend: SupabaseBackend | null) {
+    this.remote = backend;
+    if (backend) void this.pushAllToRemote();
+  }
+
+  public isRemoteActive(): boolean {
+    return Boolean(this.remote?.isActive());
+  }
+
+  private queueRemote(task: () => Promise<void>) {
+    this.remoteQueue = this.remoteQueue.then(task).catch((e) => console.error(e));
+  }
+
+  private async upsertRemote<T>(table: EntityKey, rows: T[]) {
+    if (!this.remote?.isActive()) return;
+    await this.remote.upsert(
+      table,
+      rows.map((r) => {
+        const { created_at, updated_at, ...rest } = r as Record<string, unknown>;
+        return { ...rest, updated_at: new Date().toISOString() };
+      }),
+    );
+  }
+
+  private async deleteRemote(table: EntityKey, id: string) {
+    if (!this.remote?.isActive()) return;
+    await this.remote.remove(table, id);
+  }
+
+  private pushAllToRemote() {
+    if (!this.remote?.isActive()) return;
+    this.queueRemote(async () => {
+      await Promise.all([
+        this.upsertRemote<Farm>('farms', this.farms),
+        this.upsertRemote<Plot>('plots', this.plots),
+        this.upsertRemote<CropCycle>('crop_cycles', this.cropCycles),
+        this.upsertRemote<Contact>('contacts', this.contacts),
+        this.upsertRemote<InventoryItem>('inventory_items', this.inventory),
+        this.upsertRemote<Worker>('workers', this.workers),
+        this.upsertRemote<FarmTask>('farm_tasks', this.tasks),
+        this.upsertRemote<FinancialRecord>('financial_records', this.financials),
+        this.upsertRemote<Investment>('investments', this.investments),
+      ]);
+    });
+  }
+
+  /** Load the tenant's live data from Supabase into the local cache. */
+  public async hydrateFromRemote(farmId: string) {
+    if (!this.remote?.isConfigured()) return;
+    this.remote.farmId = farmId;
+    const [farms, plots, cropCycles, contacts, inventory, workers, tasks, financials, investments] =
+      await Promise.all([
+        this.remote.fetchAll<Farm>('farms'),
+        this.remote.fetchAll<Plot>('plots'),
+        this.remote.fetchAll<CropCycle>('crop_cycles'),
+        this.remote.fetchAll<Contact>('contacts'),
+        this.remote.fetchAll<InventoryItem>('inventory_items'),
+        this.remote.fetchAll<Worker>('workers'),
+        this.remote.fetchAll<FarmTask>('farm_tasks'),
+        this.remote.fetchAll<FinancialRecord>('financial_records'),
+        this.remote.fetchAll<Investment>('investments'),
+      ]);
+    this.farms = farms;
+    this.plots = plots;
+    this.cropCycles = cropCycles;
+    this.contacts = contacts;
+    this.inventory = inventory;
+    this.workers = workers;
+    this.tasks = tasks;
+    this.financials = financials;
+    this.investments = investments;
+    this.saveAll();
+  }
+
+  /** Demo/offline farm switch: re-reads localStorage and notifies subscribers. */
+  public hydrateLocal(_farmId?: string) {
+    this.loadFromStorage();
+    this.notify();
+  }
 
   private farms: Farm[] = [];
   private profiles: Profile[] = [];
@@ -106,6 +195,7 @@ class LocalDatabaseStore {
     localStorage.setItem('agri_financials', JSON.stringify(this.financials));
     localStorage.setItem('agri_investments', JSON.stringify(this.investments));
     this.notify();
+    this.pushAllToRemote();
   }
 
   public subscribe(listener: Listener): () => void {
@@ -145,6 +235,7 @@ class LocalDatabaseStore {
   public deleteFarm(id: string) {
     this.farms = this.farms.filter((f) => f.id !== id);
     this.saveAll();
+    this.queueRemote(() => this.deleteRemote('farms', id));
   }
 
   // --- PROFILES ---
@@ -212,6 +303,7 @@ class LocalDatabaseStore {
       }
     }
     this.saveAll();
+    this.queueRemote(() => this.deleteRemote('plots', id));
   }
 
   // --- CROP CYCLES ---
@@ -247,6 +339,7 @@ class LocalDatabaseStore {
   public deleteCropCycle(id: string) {
     this.cropCycles = this.cropCycles.filter((c) => c.id !== id);
     this.saveAll();
+    this.queueRemote(() => this.deleteRemote('crop_cycles', id));
   }
 
   // --- CONTACTS ---
@@ -278,6 +371,7 @@ class LocalDatabaseStore {
   public deleteContact(id: string) {
     this.contacts = this.contacts.filter((c) => c.id !== id);
     this.saveAll();
+    this.queueRemote(() => this.deleteRemote('contacts', id));
   }
 
   // --- INVENTORY ---
@@ -310,6 +404,7 @@ class LocalDatabaseStore {
   public deleteInventoryItem(id: string) {
     this.inventory = this.inventory.filter((i) => i.id !== id);
     this.saveAll();
+    this.queueRemote(() => this.deleteRemote('inventory_items', id));
   }
 
   // --- WORKERS ---
@@ -341,6 +436,7 @@ class LocalDatabaseStore {
   public deleteWorker(id: string) {
     this.workers = this.workers.filter((w) => w.id !== id);
     this.saveAll();
+    this.queueRemote(() => this.deleteRemote('workers', id));
   }
 
   // --- TASKS ---
@@ -450,6 +546,7 @@ class LocalDatabaseStore {
     this.tasks = this.tasks.filter((t) => t.id !== id);
     this.financials = this.financials.filter((f) => f.task_id !== id);
     this.saveAll();
+    this.queueRemote(() => this.deleteRemote('farm_tasks', id));
   }
 
   // --- FINANCIALS ---
@@ -484,6 +581,7 @@ class LocalDatabaseStore {
   public deleteFinancialRecord(id: string) {
     this.financials = this.financials.filter((f) => f.id !== id);
     this.saveAll();
+    this.queueRemote(() => this.deleteRemote('financial_records', id));
   }
 
   // --- INVESTMENTS ---
@@ -517,6 +615,7 @@ class LocalDatabaseStore {
   public deleteInvestment(id: string) {
     this.investments = this.investments.filter((i) => i.id !== id);
     this.saveAll();
+    this.queueRemote(() => this.deleteRemote('investments', id));
   }
 }
 

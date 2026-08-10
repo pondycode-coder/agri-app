@@ -1,15 +1,21 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { dbStore } from '../services/store';
-import { Profile, AppRole } from '../types/database';
+import { Profile, Farm, AppRole } from '../types/database';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { activateFarm, detachFarm, listUserFarms, switchFarm as switchFarmRemote, createFarmAndSwitch, joinFarmAndSwitch } from '../lib/remoteSync';
 
 interface AuthContextType {
   user: Profile | null;
   loading: boolean;
+  farms: Farm[];
+  activeFarmId: string | null;
   signIn: (email: string, password?: string) => Promise<void>;
   signUp: (email: string, password?: string, name?: string, role?: AppRole) => Promise<void>;
   signOut: () => Promise<void>;
   switchRole: (role: AppRole) => void;
+  switchFarm: (farmId: string) => Promise<void>;
+  createFarm: (data: { name: string; location?: string; size_in_hectares?: number; description?: string }) => Promise<Farm | null>;
+  joinFarm: (farmId: string) => Promise<Farm | null>;
   loginAsDemo: (role: AppRole) => void;
   resetPassword: (email: string) => Promise<void>;
 }
@@ -45,6 +51,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
   });
   const [loading, setLoading] = useState<boolean>(false);
+  const [farms, setFarms] = useState<Farm[]>([]);
+  const [activeFarmId, setActiveFarmId] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -58,33 +66,37 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     if (!isSupabaseConfigured()) return;
 
+    const applySession = (sessionUser: { id: string; email?: string | null; user_metadata?: { name?: string }; created_at: string }) => {
+      const email = sessionUser.email || '';
+      const name = sessionUser.user_metadata?.name || email.split('@')[0];
+      const profile: Profile = {
+        id: sessionUser.id,
+        email,
+        name,
+        role: 'admin',
+        farm_id: 'farm-1',
+        created_at: sessionUser.created_at,
+        updated_at: new Date().toISOString(),
+      };
+      setUser(profile);
+      setActiveFarmId(profile.farm_id || null);
+      void (async () => {
+        await activateFarm(profile);
+        const userFarms = await listUserFarms();
+        if (userFarms.length > 0) setFarms(userFarms);
+      })();
+    };
+
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        const email = session.user.email || '';
-        const name = session.user.user_metadata?.name || email.split('@')[0];
-        setUser({
-          id: session.user.id,
-          email,
-          name,
-          role: 'admin',
-          created_at: session.user.created_at,
-          updated_at: new Date().toISOString(),
-        });
-      }
+      if (session?.user) applySession(session.user);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
-        const email = session.user.email || '';
-        const name = session.user.user_metadata?.name || email.split('@')[0];
-        setUser({
-          id: session.user.id,
-          email,
-          name,
-          role: 'admin',
-          created_at: session.user.created_at,
-          updated_at: new Date().toISOString(),
-        });
+        applySession(session.user);
+      } else {
+        detachFarm();
+        setUser(null);
       }
     });
 
@@ -97,6 +109,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (isSupabaseConfigured()) {
         const { error } = await supabase.auth.signInWithPassword({ email, password: _password || 'password123' });
         if (error) throw error;
+        // session-change listener in the effect above applies the farm
       } else {
         const profiles = dbStore.getProfiles();
         let match = profiles.find((p) => p.email.toLowerCase() === email.toLowerCase());
@@ -142,10 +155,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const signOut = async () => {
+    detachFarm();
     if (isSupabaseConfigured()) {
       await supabase.auth.signOut();
     }
     setUser(null);
+    setFarms([]);
+    setActiveFarmId(null);
   };
 
   const switchRole = (newRole: AppRole) => {
@@ -153,6 +169,37 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const updated = { ...user, role: newRole };
     setUser(updated);
     dbStore.saveProfile(updated);
+  };
+
+  const refreshFarms = async () => {
+    const userFarms = await listUserFarms();
+    if (userFarms.length > 0) setFarms(userFarms);
+  };
+
+  const switchFarm = async (farmId: string) => {
+    setActiveFarmId(farmId);
+    await switchFarmRemote(farmId);
+    if (user) setUser({ ...user, farm_id: farmId });
+  };
+
+  const createFarm = async (data: { name: string; location?: string; size_in_hectares?: number; description?: string }) => {
+    if (!user) return null;
+    const created = await createFarmAndSwitch(data);
+    if (!created) return null;
+    setActiveFarmId(created.id);
+    if (user) setUser({ ...user, farm_id: created.id });
+    await refreshFarms();
+    return created;
+  };
+
+  const joinFarm = async (farmId: string) => {
+    if (!user) return null;
+    const joined = await joinFarmAndSwitch(farmId);
+    if (!joined) return null;
+    setActiveFarmId(joined.id);
+    if (user) setUser({ ...user, farm_id: joined.id });
+    await refreshFarms();
+    return joined;
   };
 
   const loginAsDemo = (role: AppRole) => {
@@ -174,10 +221,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       value={{
         user,
         loading,
+        farms,
+        activeFarmId,
         signIn,
         signUp,
         signOut,
         switchRole,
+        switchFarm,
+        createFarm,
+        joinFarm,
         loginAsDemo,
         resetPassword,
       }}
