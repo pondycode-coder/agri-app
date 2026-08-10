@@ -3,6 +3,10 @@
 -- Users see only rows belonging to their farm (Profiles.farm_id).
 -- Apply via Supabase CLI:  supabase db push   (or paste in SQL Editor)
 
+-- Helpers (e.g. current_farm_id()) reference tables created later in this
+-- file; defer body validation to runtime so order of definition is free.
+SET check_function_bodies = false;
+
 create extension if not exists pgcrypto;
 
 -- ------------------------------------------------------------------
@@ -342,3 +346,5 @@ create policy "investments_update_own" on public.investments
   with check (coalesce(farm_id, public.current_farm_id()) = public.current_farm_id());
 create policy "investments_delete_own" on public.investments
   for delete using (coalesce(farm_id, public.current_farm_id()) = public.current_farm_id());
+
+RESET check_function_bodies;
