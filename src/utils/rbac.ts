@@ -1,4 +1,4 @@
-import { AppRole, Profile } from '@/types/database';
+import { AppRole } from '@/types/database';
 
 export type PermissionAction =
   | 'view'
