@@ -64,6 +64,23 @@ export class SupabaseBackend {
   }
 
   // --- tenant bootstrap --------------------------------------------------
+  /** Fetch the current user's profile row (farm_id, role) from the DB. */
+  public async getMyProfile(): Promise<Profile | null> {
+    if (!this.isConfigured()) return null;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id' as never, user.id as never)
+      .maybeSingle();
+    if (error) {
+      console.error('[supabase] getMyProfile:', error.message);
+      return null;
+    }
+    return data as Profile | null;
+  }
+
   /** Claim the current Auth0-style Supabase user's profile row so RLS resolves. */
   public async bindProfileToFarm(profile: Profile): Promise<Profile | null> {
     if (!this.isConfigured() || !profile.id) return null;

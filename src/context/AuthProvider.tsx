@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { dbStore } from '../services/store';
 import { Profile, Farm, AppRole } from '../types/database';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { activateFarm, detachFarm, listUserFarms, switchFarm as switchFarmRemote, createFarmAndSwitch, joinFarmAndSwitch } from '../lib/remoteSync';
+import { activateFarm, detachFarm, listUserFarms, switchFarm as switchFarmRemote, createFarmAndSwitch, joinFarmAndSwitch, getMyProfile } from '../lib/remoteSync';
 
 interface AuthContextType {
   user: Profile | null;
@@ -66,25 +66,33 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     if (!isSupabaseConfigured()) return;
 
-    const applySession = (sessionUser: { id: string; email?: string | null; user_metadata?: { name?: string }; created_at: string }) => {
+    const applySession = async (sessionUser: { id: string; email?: string | null; user_metadata?: { name?: string }; created_at: string }) => {
       const email = sessionUser.email || '';
       const name = sessionUser.user_metadata?.name || email.split('@')[0];
-      const profile: Profile = {
+      const baseProfile: Profile = {
         id: sessionUser.id,
         email,
         name,
         role: 'admin',
-        farm_id: 'farm-1',
+        farm_id: null,
         created_at: sessionUser.created_at,
         updated_at: new Date().toISOString(),
       };
+
+      // Resolve the user's real profile (farm_id/role) from the DB — the
+      // handle_new_user trigger attaches sign-ups to the seed farm.
+      const dbProfile = await getMyProfile();
+      const profile: Profile = dbProfile
+        ? { ...baseProfile, ...dbProfile }
+        : baseProfile;
+
       setUser(profile);
       setActiveFarmId(profile.farm_id || null);
-      void (async () => {
+      if (profile.farm_id) {
         await activateFarm(profile);
         const userFarms = await listUserFarms();
         if (userFarms.length > 0) setFarms(userFarms);
-      })();
+      }
     };
 
     supabase.auth.getSession().then(({ data: { session } }) => {

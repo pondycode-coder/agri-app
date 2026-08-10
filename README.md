@@ -66,10 +66,12 @@ To go multi-tenant (shared backend, Farm = tenant):
    supabase db push
    ```
    This runs every migration in `supabase/migrations/` in order. You need
-   all three:
+   all four:
    - `20260809000000_init.sql` — tables, RLS policies, `current_farm_id()`.
    - `20260809000002_user_farms.sql` — multi-farm membership + trigger.
    - `20260809000003_create_join_farm.sql` — create/join farm RPCs.
+   - `20260809000004_seed_demo.sql` — demo farm + full dataset; attaches new
+     sign-ups to it.
 
    Alternatively, paste each migration into the Supabase SQL Editor and run
    them **in order** (never out of order — they build on each other).
@@ -79,9 +81,10 @@ To go multi-tenant (shared backend, Farm = tenant):
    VITE_SUPABASE_ANON_KEY=your-anon-key
    ```
    in `.env.local` and in Vercel's Environment Variables.
-4. Sign up at `/register` — a `profiles` row is created automatically. On
-   sign-in the app seeds the farm `Plantation Agro-Ouest Bafoussam`, binds
-   your profile to it, and hydrates the local cache from Supabase.
+4. Sign up at `/register` — a `profiles` row is created automatically (the
+   `handle_new_user` trigger), and new sign-ups are attached to the seeded
+   demo farm (`Plantation Agro-Ouest Bafoussam`), so the dashboard is
+   populated immediately. The app hydrates the local cache from Supabase.
 
 ### How tenancy works
 

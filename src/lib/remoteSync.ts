@@ -43,6 +43,12 @@ export async function listUserFarms(): Promise<Farm[]> {
   return activeBackend.listMyFarms();
 }
 
+/** Fetch the signed-in user's real profile row (farm_id, role) from Supabase. */
+export async function getMyProfile(): Promise<Profile | null> {
+  if (!activeBackend?.isConfigured()) return null;
+  return activeBackend.getMyProfile();
+}
+
 /** Create a farm owned by the current user and switch to it. */
 export async function createFarmAndSwitch(
   data: { name: string; location?: string; size_in_hectares?: number; description?: string },
