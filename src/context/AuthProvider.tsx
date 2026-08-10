@@ -83,9 +83,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // Resolve the user's real profile (farm_id/role) from the DB — the
       // handle_new_user trigger attaches sign-ups to the seed farm.
       const dbProfile = await getMyProfile();
-      const profile: Profile = dbProfile
-        ? { ...baseProfile, ...dbProfile }
-        : baseProfile;
+      if (!dbProfile) {
+        // Auth session exists but the profile row is gone (deleted or never
+        // created). Don't fabricate a ghost admin — sign the user out.
+        detachFarm();
+        await supabase.auth.signOut();
+        setUser(null);
+        return;
+      }
+      const profile: Profile = { ...baseProfile, ...dbProfile };
 
       setUser(profile);
       setActiveFarmId(profile.farm_id || null);
