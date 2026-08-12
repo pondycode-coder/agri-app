@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useEffect, useState } from "react";
 import { useAuth } from "../context/AuthProvider";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -15,8 +15,34 @@ const LoginPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { signIn } = useAuth();
+  const { signIn, resendConfirmation, user } = useAuth();
   const navigate = useNavigate();
+  const submitSuccess = useRef(false);
+  const [resending, setResending] = useState(false);
+  const [resendMsg, setResendMsg] = useState<string | null>(null);
+
+  // Session apply is async (profile fetch + farm activation), so the user is
+  // not set the moment signIn resolves. Navigate once the user actually exists
+  // to avoid the PrivateRoute bouncing the login attempt back.
+  useEffect(() => {
+    if (submitSuccess.current && user) {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [user, navigate]);
+
+  const handleResend = async () => {
+    if (!email) return;
+    setResending(true);
+    setResendMsg(null);
+    try {
+      await resendConfirmation(email);
+      setResendMsg("Confirmation email sent. Please check your inbox.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not resend the confirmation email.");
+    } finally {
+      setResending(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,9 +50,10 @@ const LoginPage: React.FC = () => {
     setError(null);
     try {
       await signIn(email, password);
-      navigate("/dashboard", { replace: true });
+      submitSuccess.current = true;
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
+      submitSuccess.current = false;
     } finally {
       setLoading(false);
     }
@@ -99,6 +126,19 @@ const LoginPage: React.FC = () => {
                 "Sign In"
               )}
             </Button>
+            {resendMsg && (
+              <p className="text-sm text-emerald-600 text-center">{resendMsg}</p>
+            )}
+            <div className="text-center text-sm">
+              <button
+                type="button"
+                onClick={() => void handleResend()}
+                disabled={resending || loading || !email}
+                className="font-medium text-primary hover:underline disabled:opacity-50"
+              >
+                {resending ? "Sending..." : "Resend confirmation email"}
+              </button>
+            </div>
           </form>
         </CardContent>
         <CardFooter className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">

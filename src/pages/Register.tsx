@@ -17,8 +17,25 @@ const RegisterPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const { signUp } = useAuth();
+  const { signUp, resendConfirmation } = useAuth();
   const navigate = useNavigate();
+
+  const [resending, setResending] = useState(false);
+  const [resendMsg, setResendMsg] = useState<string | null>(null);
+
+  const handleResend = async () => {
+    if (!email) return;
+    setResending(true);
+    setResendMsg(null);
+    try {
+      await resendConfirmation(email);
+      setResendMsg("Confirmation email sent. Please check your inbox.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not resend the confirmation email.");
+    } finally {
+      setResending(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -127,6 +144,19 @@ const RegisterPage: React.FC = () => {
                 "Sign Up"
               )}
             </Button>
+            {resendMsg && (
+              <p className="text-sm text-emerald-600 text-center">{resendMsg}</p>
+            )}
+            <div className="text-center text-sm">
+              <button
+                type="button"
+                onClick={() => void handleResend()}
+                disabled={resending || loading || !email}
+                className="font-medium text-primary hover:underline disabled:opacity-50"
+              >
+                {resending ? "Sending..." : "Resend confirmation email"}
+              </button>
+            </div>
           </form>
         </CardContent>
         <CardFooter className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">

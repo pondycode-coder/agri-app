@@ -81,6 +81,23 @@ export class SupabaseBackend {
     return data as Profile | null;
   }
 
+  /** Re-create the signed-in user's profile row if it was wiped (DB reset). */
+  public async ensureMyProfile(name: string, email: string): Promise<Profile | null> {
+    if (!this.isConfigured()) return null;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
+    const { data, error } = await supabase.rpc('ensure_profile', {
+      p_user_id: user.id,
+      p_name: name,
+      p_email: email,
+    } as never);
+    if (error) {
+      console.error('[supabase] ensure_profile:', error.message);
+      return null;
+    }
+    return data as Profile | null;
+  }
+
   /** Claim the current Auth0-style Supabase user's profile row so RLS resolves. */
   public async bindProfileToFarm(profile: Profile): Promise<Profile | null> {
     if (!this.isConfigured() || !profile.id) return null;

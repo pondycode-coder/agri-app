@@ -49,6 +49,12 @@ export async function getMyProfile(): Promise<Profile | null> {
   return activeBackend.getMyProfile();
 }
 
+/** Re-create the profile row when it is missing (e.g. after a DB reset). */
+export async function ensureMyProfile(name: string, email: string): Promise<Profile | null> {
+  if (!activeBackend?.isConfigured()) return null;
+  return activeBackend.ensureMyProfile(name, email);
+}
+
 /** Create a farm owned by the current user and switch to it. */
 export async function createFarmAndSwitch(
   data: { name: string; location?: string; size_in_hectares?: number; description?: string },

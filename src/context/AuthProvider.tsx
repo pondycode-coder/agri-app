@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { dbStore } from '../services/store';
 import { Profile, Farm, AppRole } from '../types/database';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { activateFarm, detachFarm, listUserFarms, switchFarm as switchFarmRemote, createFarmAndSwitch, joinFarmAndSwitch, getMyProfile } from '../lib/remoteSync';
+import { activateFarm, detachFarm, listUserFarms, switchFarm as switchFarmRemote, createFarmAndSwitch, joinFarmAndSwitch, getMyProfile, ensureMyProfile } from '../lib/remoteSync';
 
 interface AuthContextType {
   user: Profile | null;
@@ -19,6 +19,7 @@ interface AuthContextType {
   joinFarm: (farmId: string) => Promise<Farm | null>;
   loginAsDemo: (role: AppRole) => void;
   resetPassword: (email: string) => Promise<void>;
+  resendConfirmation: (email: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -82,10 +83,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       // Resolve the user's real profile (farm_id/role) from the DB — the
       // handle_new_user trigger attaches sign-ups to the seed farm.
-      const dbProfile = await getMyProfile();
+      let dbProfile = await getMyProfile();
       if (!dbProfile) {
-        // Auth session exists but the profile row is gone (deleted or never
-        // created). Don't fabricate a ghost admin — sign the user out.
+        // Profile row is missing (e.g. after a DB reset wiped public.profiles
+        // — the signup trigger only fires for new sign-ups). Re-provision it
+        // server-side exactly like handle_new_user would.
+        await ensureMyProfile(name, email);
+        dbProfile = await getMyProfile();
+      }
+      if (!dbProfile) {
+        // Still no profile: don't fabricate a ghost admin — sign the user out.
         detachFarm();
         await supabase.auth.signOut();
         setUser(null);
@@ -153,7 +160,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           password: _password || 'password123',
           options: { data: { name, role } },
         });
-        if (error) throw error;
+        if (error) {
+          const code = error.code || '';
+          const msg = error.message.toLowerCase();
+          if (code === 'user_already_exists' || msg.includes('already') || msg.includes('exists')) {
+            throw new Error('An account with this email already exists. Try signing in or resend the confirmation email.');
+          }
+          throw error;
+        }
       } else {
         const newProf = dbStore.saveProfile({
           id: 'user-' + Date.now(),
@@ -231,6 +245,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const resendConfirmation = async (email: string) => {
+    if (!isSupabaseConfigured()) return;
+    const { error } = await supabase.auth.resend({ type: 'signup', email });
+    if (error) throw error;
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -248,6 +268,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         joinFarm,
         loginAsDemo,
         resetPassword,
+        resendConfirmation,
       }}
     >
       {children}
