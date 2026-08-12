@@ -451,7 +451,25 @@ class LocalDatabaseStore {
     }
 
     const previousTask = taskData.id ? this.tasks.find((t) => t.id === taskData.id) : null;
-    const wageAmount = typeof taskData.wage_amount === 'number' ? taskData.wage_amount : previousTask?.wage_amount ?? 0;
+
+    // Per-worker wages: use the incoming map (falling back to the stored one),
+    // but only keep entries for workers still assigned to the task.
+    const workerWages =
+      taskData.worker_wages && Object.keys(taskData.worker_wages).length > 0
+        ? { ...taskData.worker_wages }
+        : previousTask?.worker_wages && Object.keys(previousTask.worker_wages).length > 0
+          ? { ...previousTask.worker_wages }
+          : undefined;
+    if (workerWages) {
+      for (const wid of Object.keys(workerWages)) {
+        if (!assignedWorkerIds.includes(wid)) delete workerWages[wid];
+      }
+    }
+    // Task-level total is the sum of per-worker wages when they exist.
+    const wageAmount =
+      workerWages && Object.keys(workerWages).length > 0
+        ? Object.values(workerWages).reduce((sum, v) => sum + (Number(v) || 0), 0)
+        : typeof taskData.wage_amount === 'number' ? taskData.wage_amount : previousTask?.wage_amount ?? 0;
     const wagePaid = typeof taskData.wage_paid === 'boolean' ? taskData.wage_paid : previousTask?.wage_paid ?? false;
     let savedTask: FarmTask;
 
@@ -463,6 +481,7 @@ class LocalDatabaseStore {
               ...taskData,
               worker_ids: assignedWorkerIds,
               worker_id: assignedWorkerIds[0] || null,
+              worker_wages: workerWages,
               wage_amount: wageAmount,
               wage_paid: wagePaid,
               updated_at: now,
@@ -479,6 +498,7 @@ class LocalDatabaseStore {
         plot_id: taskData.plot_id || null,
         worker_ids: assignedWorkerIds,
         worker_id: assignedWorkerIds[0] || null,
+        worker_wages: workerWages,
         wage_amount: wageAmount,
         wage_paid: wagePaid,
         status: taskData.status || 'pending',

@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { I18nProvider } from "@/context/I18nProvider";
 import Tasks from "@/pages/Tasks";
@@ -67,14 +68,24 @@ describe("Tasks page", () => {
     expect(screen.getAllByText(/Non Payé/i).length).toBeGreaterThan(0);
   });
 
-  it("opens the create dialog and allows editing task wage fields", () => {
+  it("opens the create dialog, assigns a worker, and edits the per-worker wage", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
     renderTasks();
 
-    fireEvent.click(screen.getByText(/Créer une Tâche/i));
+    await user.click(screen.getByText(/Créer une Tâche/i));
+
+    // No per-worker wage input until a worker is assigned.
+    expect(screen.queryByRole('spinbutton')).toBeNull();
+
+    // Select a worker from the assignment dropdown.
+    await user.click(screen.getByText(/Sélectionner des ouvriers…/i));
+    await user.click(await screen.findByRole('menuitemcheckbox', { name: /Samuel Mvondo/ }));
+
     const wageInputs = screen.getAllByRole('spinbutton');
     expect(wageInputs.length).toBeGreaterThan(0);
     const wageInput = wageInputs[0] as HTMLInputElement;
-    fireEvent.change(wageInput, { target: { value: '8000' } });
+    await user.clear(wageInput);
+    await user.type(wageInput, '8000');
     expect(wageInput.value).toBe('8000');
   });
 

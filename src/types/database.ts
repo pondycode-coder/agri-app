@@ -132,6 +132,8 @@ export interface FarmTask {
   worker_ids?: string[];
   /** Legacy single-worker fallback for backwards compatibility */
   worker_id?: string | null;
+  /** Per-worker wage map (worker id -> wage in FCFA). Sum equals wage_amount. */
+  worker_wages?: Record<string, number>;
   title: string;
   description?: string;
   farm_id: string;

@@ -7,6 +7,13 @@
 -- below), so registration lands on a populated tenant.
 
 -- Fixed UUIDs keep the seed stable and referenceable across tables.
+
+-- The farm_tasks columns for multi-worker assignment + per-worker wages are
+-- defined by a later migration; ensure they exist before seeding tasks.
+alter table public.farm_tasks
+  add column if not exists worker_ids jsonb not null default '[]'::jsonb,
+  add column if not exists worker_wages jsonb not null default '{}'::jsonb;
+
 do $$
 declare
   v_farm uuid := '00000000-0000-4000-8000-000000000001';
@@ -96,25 +103,33 @@ begin
   -- farm_tasks
   -- ---------------------------------------------------------------
   insert into public.farm_tasks
-    (id, farm_id, worker_id, plot_id, title, description, status, assigned_date, due_date,
-     completed_date, wage_amount, wage_paid, notes)
+    (id, farm_id, worker_id, worker_ids, plot_id, title, description, status, assigned_date, due_date,
+     completed_date, wage_amount, worker_wages, wage_paid, notes)
   values
     ('00000000-0000-4000-8000-000000000601', v_farm,
-     '00000000-0000-4000-8000-000000000501', '00000000-0000-4000-8000-000000000101',
+     '00000000-0000-4000-8000-000000000501', '["00000000-0000-4000-8000-000000000501"]'::jsonb,
+     '00000000-0000-4000-8000-000000000101',
      'Émondage et désherbage parcelle Cacao A',
      'Nettoyer les pieds de cacaoyers et éliminer les rejets parasitaires.',
-     'in_progress', '2025-02-20', '2025-02-28', null, 12500, false,
+     'in_progress', '2025-02-20', '2025-02-28', null, 12500,
+     '{"00000000-0000-4000-8000-000000000501": 12500}'::jsonb, false,
      'Priorité avant le début des premières pluies.'),
     ('00000000-0000-4000-8000-000000000602', v_farm,
-     '00000000-0000-4000-8000-000000000502', '00000000-0000-4000-8000-000000000101',
+     '00000000-0000-4000-8000-000000000502', '["00000000-0000-4000-8000-000000000502"]'::jsonb,
+     '00000000-0000-4000-8000-000000000101',
      'Traitement phytosanitaire fongicide Nordox',
      'Traitement préventif contre la pourriture brune des cabosses de cacao.',
-     'pending', '2025-03-01', '2025-03-05', null, 6500, false, null),
+     'pending', '2025-03-01', '2025-03-05', null, 6500,
+     '{"00000000-0000-4000-8000-000000000502": 6500}'::jsonb, false, null),
     ('00000000-0000-4000-8000-000000000603', v_farm,
-     '00000000-0000-4000-8000-000000000501', '00000000-0000-4000-8000-000000000102',
+     '00000000-0000-4000-8000-000000000501',
+     '["00000000-0000-4000-8000-000000000501","00000000-0000-4000-8000-000000000502","00000000-0000-4000-8000-000000000503"]'::jsonb,
+     '00000000-0000-4000-8000-000000000102',
      'Récolte et conditionnement des tomates Cobra F1',
      'Tri selon le calibre A/B/C et mise en cagettes.',
-     'completed', '2025-02-22', '2025-02-25', '2025-02-24', 22000, true, null);
+     'completed', '2025-02-22', '2025-02-25', '2025-02-24', 22000,
+     '{"00000000-0000-4000-8000-000000000501": 8000,"00000000-0000-4000-8000-000000000502": 7000,"00000000-0000-4000-8000-000000000503": 7000}'::jsonb,
+     true, null);
 
   -- ---------------------------------------------------------------
   -- financial_records

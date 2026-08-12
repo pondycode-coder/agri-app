@@ -101,6 +101,44 @@ describe("LocalDatabaseStore - Tasks & Wages", () => {
     expect(dbStore.getTasks().some((t) => t.id === task.id)).toBe(false);
     expect(dbStore.getFinancials().filter((f) => f.task_id === task.id)).toHaveLength(0);
   });
+
+  it("sums per-worker wages into the task total and the linked expense", () => {
+    const task = dbStore.saveTask({
+      farm_id: "farm-1",
+      worker_ids: ["wrk-1", "wrk-2"],
+      title: "Récolte cacao",
+      status: "completed",
+      wage_paid: true,
+      worker_wages: { "wrk-1": 2000, "wrk-2": 1500 },
+    });
+
+    expect(task.wage_amount).toBe(3500);
+    expect(task.worker_wages).toEqual({ "wrk-1": 2000, "wrk-2": 1500 });
+    const expense = dbStore.getFinancials().find((f) => f.task_id === task.id)!;
+    expect(expense.amount).toBe(3500);
+  });
+
+  it("prunes worker_wages for workers removed from the task", () => {
+    const task = dbStore.saveTask({
+      farm_id: "farm-1",
+      worker_ids: ["wrk-1", "wrk-2"],
+      title: "Désherbage",
+      status: "completed",
+      wage_paid: true,
+      worker_wages: { "wrk-1": 2000, "wrk-2": 1500 },
+    });
+
+    const updated = dbStore.saveTask({
+      ...task,
+      worker_ids: ["wrk-1"],
+      worker_wages: { "wrk-1": 2000, "wrk-2": 1500 },
+    });
+
+    expect(updated.worker_wages).toEqual({ "wrk-1": 2000 });
+    expect(updated.wage_amount).toBe(2000);
+    const expense = dbStore.getFinancials().find((f) => f.task_id === task.id)!;
+    expect(expense.amount).toBe(2000);
+  });
 });
 
 describe("LocalDatabaseStore - CRUD", () => {

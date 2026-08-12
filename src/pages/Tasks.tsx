@@ -8,13 +8,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuCheckboxItem, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { useI18n } from '@/context/I18nProvider';
 import { dbStore } from '@/services/store';
 import { FarmTask } from '@/types/database';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { CheckSquare, Plus, Pencil, Trash2 } from 'lucide-react';
+import { CheckSquare, Plus, Pencil, Trash2, ChevronDown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { formatFCFA } from '@/types/database';
 
@@ -36,7 +37,7 @@ export default function Tasks() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<FarmTask | null>(null);
   const [form, setForm] = useState({
-    farm_id: '', title: '', description: '', worker_ids: [] as string[], plot_id: '',
+    farm_id: '', title: '', description: '', worker_ids: [] as string[], worker_wages: {} as Record<string, number>, plot_id: '',
     wage_amount: 0, wage_paid: false,
     status: 'pending' as FarmTask['status'], assigned_date: new Date().toISOString().split('T')[0],
     due_date: '',
@@ -62,17 +63,25 @@ export default function Tasks() {
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ farm_id: farms[0]?.id || '', title: '', description: '', worker_ids: [], plot_id: '', wage_amount: 0, wage_paid: false, status: 'pending', assigned_date: new Date().toISOString().split('T')[0], due_date: '' });
+    setForm({ farm_id: farms[0]?.id || '', title: '', description: '', worker_ids: [], worker_wages: {}, plot_id: '', wage_amount: 0, wage_paid: false, status: 'pending', assigned_date: new Date().toISOString().split('T')[0], due_date: '' });
     setDialogOpen(true);
   };
 
   const openEdit = (task: FarmTask) => {
+    const workerIds = task.worker_ids?.length ? task.worker_ids : task.worker_id ? [task.worker_id] : [];
+    const workerWages =
+      task.worker_wages && Object.keys(task.worker_wages).length > 0
+        ? { ...task.worker_wages }
+        : workerIds.length
+          ? Object.fromEntries(workerIds.map((id) => [id, Math.round((task.wage_amount ?? 0) / workerIds.length)]))
+          : {};
     setEditing(task);
     setForm({
       farm_id: task.farm_id,
       title: task.title,
       description: task.description || '',
-      worker_ids: task.worker_ids?.length ? task.worker_ids : task.worker_id ? [task.worker_id] : [],
+      worker_ids: workerIds,
+      worker_wages: workerWages,
       plot_id: task.plot_id || '',
       wage_amount: task.wage_amount ?? 0,
       wage_paid: task.wage_paid ?? false,
@@ -84,12 +93,16 @@ export default function Tasks() {
   };
 
   const toggleWorkerAssignment = (workerId: string) => {
-    setForm((prev) => ({
-      ...prev,
-      worker_ids: prev.worker_ids.includes(workerId)
-        ? prev.worker_ids.filter((id) => id !== workerId)
-        : [...prev.worker_ids, workerId],
-    }));
+    setForm((prev) => {
+      const included = prev.worker_ids.includes(workerId);
+      const worker_wages = { ...prev.worker_wages };
+      if (included) {
+        delete worker_wages[workerId];
+        return { ...prev, worker_ids: prev.worker_ids.filter((id) => id !== workerId), worker_wages };
+      }
+      worker_wages[workerId] = 0;
+      return { ...prev, worker_ids: [...prev.worker_ids, workerId], worker_wages };
+    });
   };
 
   const handleSave = () => {
@@ -110,12 +123,14 @@ export default function Tasks() {
 
   const getPlotName = (id?: string | null) => id ? plots.find((p) => p.id === id)?.name || '—' : '—';
 
-  const getWorkerNames = (task: FarmTask) => {
+  const getWorkerWageBreakdown = (task: FarmTask) => {
     const workerIds = task.worker_ids?.length ? task.worker_ids : task.worker_id ? [task.worker_id] : [];
-    if (!workerIds.length) return '—';
-    return workerIds
-      .map((id) => workers.find((w) => w.id === id)?.name || '—')
-      .join(', ');
+    const total = task.wage_amount ?? 0;
+    return workerIds.map((id) => ({
+      id,
+      name: workers.find((w) => w.id === id)?.name || '—',
+      wage: task.worker_wages?.[id] != null ? task.worker_wages[id] : Math.round(total / workerIds.length),
+    }));
   };
 
 
@@ -151,7 +166,20 @@ export default function Tasks() {
                 ) : tasks.map((task) => (
                   <TableRow key={task.id}>
                     <TableCell className="font-medium">{task.title}</TableCell>
-                    <TableCell>{getWorkerNames(task)}</TableCell>
+                    <TableCell>
+                      {getWorkerWageBreakdown(task).length === 0 ? (
+                        <span className="text-slate-400">—</span>
+                      ) : (
+                        <div className="space-y-0.5">
+                          {getWorkerWageBreakdown(task).map(({ id, name, wage }) => (
+                            <div key={id} className="flex items-center justify-between gap-3 text-sm">
+                              <span>{name}</span>
+                              <span className="text-slate-500">{formatFCFA(wage)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </TableCell>
                     <TableCell>{getPlotName(task.plot_id)}</TableCell>
                     <TableCell>{task.due_date}</TableCell>
                     <TableCell><Badge className={statusColors[task.status] || ''}>{statusLabel(task.status)}</Badge></TableCell>
@@ -185,17 +213,34 @@ export default function Tasks() {
               <div className="grid grid-cols-1 gap-4">
                 <div>
                   <Label>{t('tasks.assignedWorker')}</Label>
-                  <div className="grid gap-2 rounded-md border border-slate-200 bg-slate-50 p-3">
-                    {workers.map((w) => (
-                      <label key={w.id} className="flex items-center gap-3 text-sm text-slate-700">
-                        <Checkbox
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" className="w-full justify-between h-9 font-normal">
+                        <span className="truncate text-sm">
+                          {form.worker_ids.length
+                            ? form.worker_ids
+                                .map((id) => workers.find((w) => w.id === id)?.name || '—')
+                                .join(', ')
+                            : <span className="text-slate-400">Sélectionner des ouvriers…</span>}
+                        </span>
+                        <ChevronDown className="h-4 w-4 opacity-50 shrink-0" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent className="w-72 max-h-64 overflow-y-auto">
+                      {workers.length === 0 && (
+                        <DropdownMenuItem disabled>Aucun ouvrier disponible</DropdownMenuItem>
+                      )}
+                      {workers.map((w) => (
+                        <DropdownMenuCheckboxItem
+                          key={w.id}
                           checked={form.worker_ids.includes(w.id)}
                           onCheckedChange={() => toggleWorkerAssignment(w.id)}
-                        />
-                        <span>{w.name} ({w.role.replace('_', ' ')})</span>
-                      </label>
-                    ))}
-                  </div>
+                        >
+                          {w.name} ({w.role.replace('_', ' ')})
+                        </DropdownMenuCheckboxItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
                 <div><Label>{t('tasks.assignedPlot')}</Label>
                   <Select value={form.plot_id} onValueChange={(v) => setForm({ ...form, plot_id: v })}>
@@ -208,15 +253,46 @@ export default function Tasks() {
                 <div><Label>{t('tasks.assignedDate')}</Label><Input type="date" value={form.assigned_date} onChange={(e) => setForm({ ...form, assigned_date: e.target.value })} /></div>
                 <div><Label>{t('tasks.dueDate')}</Label><Input type="date" value={form.due_date} onChange={(e) => setForm({ ...form, due_date: e.target.value })} /></div>
               </div>
-              <div className="grid grid-cols-3 gap-4">
-                <div><Label>{t('tasks.wageAmount')}</Label><Input type="number" min={0} value={form.wage_amount} onChange={(e) => setForm({ ...form, wage_amount: Number(e.target.value) })} /></div>
+              {form.worker_ids.length > 0 && (
+                <div>
+                  <Label>Salaires par ouvrier (FCFA)</Label>
+                  <div className="grid gap-2 rounded-md border border-slate-200 bg-slate-50 p-3">
+                    {form.worker_ids.map((id) => (
+                      <div key={id} className="flex items-center justify-between gap-3">
+                        <span className="text-sm text-slate-700">
+                          {workers.find((w) => w.id === id)?.name || '—'}
+                        </span>
+                        <Input
+                          type="number"
+                          min={0}
+                          value={form.worker_wages[id] ?? 0}
+                          onChange={(e) =>
+                            setForm((prev) => ({
+                              ...prev,
+                              worker_wages: { ...prev.worker_wages, [id]: Number(e.target.value) },
+                            }))
+                          }
+                          className="w-32"
+                        />
+                      </div>
+                    ))}
+                    <div className="flex items-center justify-between text-sm font-semibold text-slate-700 border-t border-slate-200 pt-2">
+                      <span>Total</span>
+                      <span>
+                        {formatFCFA(Object.values(form.worker_wages).reduce((s, v) => s + (Number(v) || 0), 0))}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-4">
                 <div className="flex items-end">
                   <label className="flex items-center gap-2 text-sm text-slate-700">
                     <Checkbox checked={form.wage_paid} onCheckedChange={(checked) => setForm({ ...form, wage_paid: Boolean(checked) })} />
                     <span>{t('tasks.paid')}</span>
                   </label>
                 </div>
-                <div className="max-w-xs">
+                <div>
                   <Label>{t('tasks.status')}</Label>
                   <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v as FarmTask['status'] })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
