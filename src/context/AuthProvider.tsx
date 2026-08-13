@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { toast } from 'sonner';
 import { dbStore } from '../services/store';
 import { Profile, Farm, AppRole } from '../types/database';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
@@ -83,16 +84,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       // Resolve the user's real profile (farm_id/role) from the DB — the
       // handle_new_user trigger attaches sign-ups to the seed farm.
-      let dbProfile = await getMyProfile();
-      if (!dbProfile) {
-        // Profile row is missing (e.g. after a DB reset wiped public.profiles
-        // — the signup trigger only fires for new sign-ups). Re-provision it
-        // server-side exactly like handle_new_user would.
-        await ensureMyProfile(name, email);
+      let dbProfile: Profile | null;
+      try {
         dbProfile = await getMyProfile();
+        if (!dbProfile) {
+          // Profile row is missing (e.g. after a DB reset wiped public.profiles
+          // — the signup trigger only fires for new sign-ups). Re-provision it
+          // server-side exactly like handle_new_user would.
+          await ensureMyProfile(name, email);
+          dbProfile = await getMyProfile();
+        }
+      } catch (err) {
+        // Profile resolution failed at the network/RPC level — show the reason
+        // instead of silently bouncing the user back to the login page.
+        toast.error('Impossible de charger votre compte', {
+          description: err instanceof Error ? err.message : String(err),
+        });
+        detachFarm();
+        await supabase.auth.signOut();
+        setUser(null);
+        return;
       }
       if (!dbProfile) {
         // Still no profile: don't fabricate a ghost admin — sign the user out.
+        toast.error('Compte introuvable', {
+          description: 'Aucun profil associé à cet identifiant. Veuillez vous réinscrire.',
+        });
         detachFarm();
         await supabase.auth.signOut();
         setUser(null);

@@ -76,7 +76,7 @@ export class SupabaseBackend {
       .maybeSingle();
     if (error) {
       console.error('[supabase] getMyProfile:', error.message);
-      return null;
+      throw new Error(`getMyProfile: ${error.message}`);
     }
     return data as Profile | null;
   }
@@ -93,7 +93,7 @@ export class SupabaseBackend {
     } as never);
     if (error) {
       console.error('[supabase] ensure_profile:', error.message);
-      return null;
+      throw new Error(`ensure_profile: ${error.message}`);
     }
     return data as Profile | null;
   }
