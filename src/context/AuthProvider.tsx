@@ -91,17 +91,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           // Profile row is missing (e.g. after a DB reset wiped public.profiles
           // — the signup trigger only fires for new sign-ups). Re-provision it
           // via ensure_profile, falling back to a client-side insert if that
-          // RPC isn't deployed yet.
-          dbProfile = await ensureMyProfile(name, email).catch(async (err: unknown) => {
-            console.warn('[auth] ensure_profile failed, falling back to direct insert:', err);
-            const { data, error } = await supabase
-              .from('profiles')
-              .insert({ id: sessionUser.id, email, name, role: 'admin', farm_id: null } as never)
-              .select()
-              .maybeSingle();
-            if (error) throw new Error(`create profile: ${error.message}`);
-            return data as Profile | null;
+          // RPC isn't deployed or returns nothing.
+          dbProfile = await ensureMyProfile(name, email).catch((err: unknown) => {
+            console.warn('[auth] ensure_profile failed:', err);
+            return null;
           });
+        }
+        if (!dbProfile) {
+          const { data, error } = await supabase
+            .from('profiles')
+            .insert({ id: sessionUser.id, email, name, role: 'admin', farm_id: null } as never)
+            .select()
+            .maybeSingle();
+          if (error) throw new Error(`create profile: ${error.message}`);
+          dbProfile = data as Profile | null;
         }
       } catch (err) {
         // Profile resolution failed at the network/RPC level — show the reason
