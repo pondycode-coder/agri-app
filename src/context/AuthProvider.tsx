@@ -69,7 +69,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     if (!isSupabaseConfigured()) return;
 
-    const applySession = async (sessionUser: { id: string; email?: string | null; user_metadata?: { name?: string }; created_at: string }) => {
+    // getSession() + onAuthStateChange both fire on sign-in; dedupe so the
+    // two runs can't double-provision the profile (duplicate key race).
+    let sessionInFlight: Promise<void> | null = null;
+    const applySession = (sessionUser: { id: string; email?: string | null; user_metadata?: { name?: string }; created_at: string }) => {
+      if (sessionInFlight) return sessionInFlight;
+      sessionInFlight = applySessionOnce(sessionUser).finally(() => {
+        sessionInFlight = null;
+      });
+      return sessionInFlight;
+    };
+
+    const applySessionOnce = async (sessionUser: { id: string; email?: string | null; user_metadata?: { name?: string }; created_at: string }) => {
       const email = sessionUser.email || '';
       const name = sessionUser.user_metadata?.name || email.split('@')[0];
       const baseProfile: Profile = {
@@ -90,21 +101,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (!dbProfile) {
           // Profile row is missing (e.g. after a DB reset wiped public.profiles
           // — the signup trigger only fires for new sign-ups). Re-provision it
-          // via ensure_profile, falling back to a client-side insert if that
-          // RPC isn't deployed or returns nothing.
-          dbProfile = await ensureMyProfile(name, email).catch((err: unknown) => {
-            console.warn('[auth] ensure_profile failed:', err);
-            return null;
-          });
-        }
-        if (!dbProfile) {
-          const { data, error } = await supabase
-            .from('profiles')
-            .insert({ id: sessionUser.id, email, name, role: 'admin', farm_id: null } as never)
-            .select()
-            .maybeSingle();
-          if (error) throw new Error(`create profile: ${error.message}`);
-          dbProfile = data as Profile | null;
+          // server-side via ensure_profile (security definer, so it sees rows
+          // RLS would hide and creates missing ones idempotently). Let RPC
+          // errors surface so the real cause is shown instead of a blind,
+          // duplicate-key-prone client insert.
+          dbProfile = await ensureMyProfile(name, email);
         }
       } catch (err) {
         // Profile resolution failed at the network/RPC level — show the reason
