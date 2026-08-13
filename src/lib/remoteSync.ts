@@ -45,14 +45,18 @@ export async function listUserFarms(): Promise<Farm[]> {
 
 /** Fetch the signed-in user's real profile row (farm_id, role) from Supabase. */
 export async function getMyProfile(): Promise<Profile | null> {
-  if (!activeBackend?.isConfigured()) return null;
-  return activeBackend.getMyProfile();
+  // Must NOT depend on activeBackend: it is only set by activateFarm(), which
+  // runs AFTER profile resolution — using it here is a chicken-and-egg deadlock.
+  const backend = activeBackend ?? new SupabaseBackend('');
+  if (!backend.isConfigured()) return null;
+  return backend.getMyProfile();
 }
 
 /** Re-create the profile row when it is missing (e.g. after a DB reset). */
 export async function ensureMyProfile(name: string, email: string): Promise<Profile | null> {
-  if (!activeBackend?.isConfigured()) return null;
-  return activeBackend.ensureMyProfile(name, email);
+  const backend = activeBackend ?? new SupabaseBackend('');
+  if (!backend.isConfigured()) return null;
+  return backend.ensureMyProfile(name, email);
 }
 
 /** Create a farm owned by the current user and switch to it. */
