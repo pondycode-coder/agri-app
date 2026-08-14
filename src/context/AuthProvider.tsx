@@ -129,6 +129,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return;
       }
       const profile: Profile = { ...baseProfile, ...dbProfile };
+      // Super admins bypass every role check (their farm role may still be the
+      // DB default 'worker', which would otherwise hide sections like Ouvriers).
+      if (profile.is_superadmin) profile.role = 'admin';
 
       setUser(profile);
       setActiveFarmId(profile.farm_id || null);
