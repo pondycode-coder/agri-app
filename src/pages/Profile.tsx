@@ -9,6 +9,28 @@ import { dbStore } from '@/services/store';
 import { UserCircle, Database, ShieldCheck } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
+import initSql from '../../supabase/migrations/20260809000000_init.sql?raw';
+import userFarmsSql from '../../supabase/migrations/20260809000002_user_farms.sql?raw';
+import joinFarmSql from '../../supabase/migrations/20260809000003_create_join_farm.sql?raw';
+import seedSql from '../../supabase/migrations/20260809000004_seed_demo.sql?raw';
+import superadminSql from '../../supabase/migrations/20260809000005_superadmin.sql?raw';
+import workerWagesSql from '../../supabase/migrations/20260809000006_task_worker_wages.sql?raw';
+import ensureProfileSql from '../../supabase/migrations/20260809000007_ensure_profile.sql?raw';
+import ensureProfileIdempotentSql from '../../supabase/migrations/20260809000008_ensure_profile_idempotent.sql?raw';
+
+// The full, current schema (every migration in order) so "Copy SQL" bootstraps
+// a complete database — including workers, farm_tasks, contacts, financials, etc.
+const MIGRATION_SQL = [
+  initSql,
+  userFarmsSql,
+  joinFarmSql,
+  seedSql,
+  superadminSql,
+  workerWagesSql,
+  ensureProfileSql,
+  ensureProfileIdempotentSql,
+].join('\n\n-- ------------------------------------------------------------------\n\n');
+
 export default function Profile() {
   const { t } = useI18n();
   const { user, switchRole } = useAuth();
@@ -22,65 +44,6 @@ export default function Profile() {
   }, []);
 
   const isSupabaseConfigured = !!(import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY);
-
-  const MIGRATION_SQL = `-- AgriApp AgriApp - Initial Schema
-CREATE TYPE app_role AS ENUM ('admin', 'manager', 'worker');
-
-CREATE TABLE profiles (
-  id UUID REFERENCES auth.users PRIMARY KEY,
-  email TEXT,
-  name TEXT,
-  avatar_url TEXT,
-  role app_role DEFAULT 'worker',
-  farm_id UUID,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
-);
-
-CREATE TABLE farms (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  name TEXT NOT NULL,
-  location TEXT,
-  plots INTEGER DEFAULT 0,
-  size_in_hectares NUMERIC DEFAULT 0,
-  description TEXT,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
-);
-
-CREATE TABLE plots (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  farm_id UUID REFERENCES farms(id),
-  name TEXT NOT NULL,
-  size_in_hectares NUMERIC DEFAULT 0,
-  soil_type TEXT,
-  status TEXT DEFAULT 'active',
-  created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
-);
-
-CREATE TABLE crop_cycles (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  plot_id UUID REFERENCES plots(id),
-  crop_name TEXT NOT NULL,
-  variety TEXT,
-  season TEXT,
-  planting_date DATE,
-  expected_harvest_date DATE,
-  actual_harvest_date DATE,
-  yield_in_kg NUMERIC,
-  status TEXT DEFAULT 'planted',
-  estimated_cost_fcfa NUMERIC DEFAULT 0,
-  revenue_fcfa NUMERIC DEFAULT 0,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
-);
-
--- Enable Row Level Security
-ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE farms ENABLE ROW LEVEL SECURITY;
-ALTER TABLE plots ENABLE ROW LEVEL SECURITY;
-ALTER TABLE crop_cycles ENABLE ROW LEVEL SECURITY;`;
 
   const handleCopySql = () => {
     navigator.clipboard.writeText(MIGRATION_SQL);
