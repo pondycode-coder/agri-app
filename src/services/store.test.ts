@@ -139,6 +139,76 @@ describe("LocalDatabaseStore - Tasks & Wages", () => {
     const expense = dbStore.getFinancials().find((f) => f.task_id === task.id)!;
     expect(expense.amount).toBe(2000);
   });
+
+  it("records an Avance Salaire expense and nets the salary by the advance", () => {
+    const task = dbStore.saveTask({
+      farm_id: "farm-1",
+      worker_ids: ["wrk-1", "wrk-2"],
+      title: "Récolte cacao",
+      status: "completed",
+      wage_paid: true,
+      worker_wages: { "wrk-1": 2000, "wrk-2": 1500 },
+      worker_advances: { "wrk-1": 1000 },
+    });
+
+    expect(task.wage_amount).toBe(3500);
+    expect(task.advance_amount).toBe(1000);
+
+    const advance = dbStore.getFinancials().find((f) => f.task_id === task.id && f.category === "Avance Salaire");
+    const salary = dbStore.getFinancials().find((f) => f.task_id === task.id && f.category === "Salaires Ouvriers");
+
+    expect(advance).toBeDefined();
+    expect(advance!.amount).toBe(1000);
+    expect(salary).toBeDefined();
+    expect(salary!.amount).toBe(2500); // 3500 - 1000
+  });
+
+  it("removes the advance expense when the advance is zeroed out", () => {
+    const task = dbStore.saveTask({
+      farm_id: "farm-1",
+      worker_ids: ["wrk-1"],
+      title: "Désherbage",
+      status: "completed",
+      wage_paid: true,
+      worker_wages: { "wrk-1": 2000 },
+      worker_advances: { "wrk-1": 500 },
+    });
+
+    expect(dbStore.getFinancials().filter((f) => f.task_id === task.id && f.category === "Avance Salaire")).toHaveLength(1);
+
+    const updated = dbStore.saveTask({
+      ...task,
+      worker_advances: { "wrk-1": 0 },
+      worker_wages: { "wrk-1": 2000 },
+    });
+
+    expect(updated.advance_amount).toBe(0);
+    expect(dbStore.getFinancials().filter((f) => f.task_id === task.id && f.category === "Avance Salaire")).toHaveLength(0);
+    const salary = dbStore.getFinancials().find((f) => f.task_id === task.id && f.category === "Salaires Ouvriers")!;
+    expect(salary.amount).toBe(2000);
+  });
+
+  it("prunes worker_advances for workers removed from the task", () => {
+    const task = dbStore.saveTask({
+      farm_id: "farm-1",
+      worker_ids: ["wrk-1", "wrk-2"],
+      title: "Désherbage",
+      status: "completed",
+      wage_paid: true,
+      worker_wages: { "wrk-1": 2000, "wrk-2": 1500 },
+      worker_advances: { "wrk-1": 500, "wrk-2": 300 },
+    });
+
+    const updated = dbStore.saveTask({
+      ...task,
+      worker_ids: ["wrk-1"],
+      worker_wages: { "wrk-1": 2000 },
+      worker_advances: { "wrk-1": 500, "wrk-2": 300 },
+    });
+
+    expect(updated.worker_advances).toEqual({ "wrk-1": 500 });
+    expect(updated.advance_amount).toBe(500);
+  });
 });
 
 describe("LocalDatabaseStore - CRUD", () => {

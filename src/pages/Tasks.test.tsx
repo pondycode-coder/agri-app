@@ -81,12 +81,14 @@ describe("Tasks page", () => {
     await user.click(screen.getByText(/Sélectionner des ouvriers…/i));
     await user.click(await screen.findByRole('menuitemcheckbox', { name: /Samuel Mvondo/ }));
 
-    const wageInputs = screen.getAllByRole('spinbutton');
-    expect(wageInputs.length).toBeGreaterThan(0);
-    const wageInput = wageInputs[0] as HTMLInputElement;
+    const wageInput = screen.getByPlaceholderText('Salaire') as HTMLInputElement;
+    const advanceInput = screen.getByPlaceholderText('Avance') as HTMLInputElement;
     await user.clear(wageInput);
     await user.type(wageInput, '8000');
+    await user.clear(advanceInput);
+    await user.type(advanceInput, '2000');
     expect(wageInput.value).toBe('8000');
+    expect(advanceInput.value).toBe('2000');
   });
 
 });

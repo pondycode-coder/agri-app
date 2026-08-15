@@ -470,6 +470,25 @@ class LocalDatabaseStore {
       workerWages && Object.keys(workerWages).length > 0
         ? Object.values(workerWages).reduce((sum, v) => sum + (Number(v) || 0), 0)
         : typeof taskData.wage_amount === 'number' ? taskData.wage_amount : previousTask?.wage_amount ?? 0;
+
+    // Per-worker advances: use the incoming map (falling back to the stored one),
+    // pruned to workers still assigned to the task.
+    const workerAdvances =
+      taskData.worker_advances && Object.keys(taskData.worker_advances).length > 0
+        ? { ...taskData.worker_advances }
+        : previousTask?.worker_advances && Object.keys(previousTask.worker_advances).length > 0
+          ? { ...previousTask.worker_advances }
+          : undefined;
+    if (workerAdvances) {
+      for (const wid of Object.keys(workerAdvances)) {
+        if (!assignedWorkerIds.includes(wid)) delete workerAdvances[wid];
+      }
+    }
+    const advanceAmount =
+      workerAdvances && Object.keys(workerAdvances).length > 0
+        ? Object.values(workerAdvances).reduce((sum, v) => sum + (Number(v) || 0), 0)
+        : typeof taskData.advance_amount === 'number' ? taskData.advance_amount : previousTask?.advance_amount ?? 0;
+    const netWageAmount = Math.max(0, wageAmount - advanceAmount);
     const wagePaid = typeof taskData.wage_paid === 'boolean' ? taskData.wage_paid : previousTask?.wage_paid ?? false;
     let savedTask: FarmTask;
 
@@ -482,6 +501,8 @@ class LocalDatabaseStore {
               worker_ids: assignedWorkerIds,
               worker_id: assignedWorkerIds[0] || null,
               worker_wages: workerWages,
+              worker_advances: workerAdvances,
+              advance_amount: advanceAmount,
               wage_amount: wageAmount,
               wage_paid: wagePaid,
               updated_at: now,
@@ -499,6 +520,8 @@ class LocalDatabaseStore {
         worker_ids: assignedWorkerIds,
         worker_id: assignedWorkerIds[0] || null,
         worker_wages: workerWages,
+        worker_advances: workerAdvances,
+        advance_amount: advanceAmount,
         wage_amount: wageAmount,
         wage_paid: wagePaid,
         status: taskData.status || 'pending',
@@ -513,14 +536,15 @@ class LocalDatabaseStore {
       savedTask = newTask;
     }
 
-    const existingExpense = this.financials.find((f) => f.task_id === savedTask.id && f.category === 'Salaires Ouvriers');
-    if (savedTask.status !== 'cancelled' && wagePaid) {
-      if (existingExpense) {
+    // Advance given up front is cash already out — record it as its own expense.
+    const existingAdvance = this.financials.find((f) => f.task_id === savedTask.id && f.category === 'Avance Salaire');
+    if (savedTask.status !== 'cancelled' && advanceAmount > 0) {
+      if (existingAdvance) {
         this.financials = this.financials.map((f) =>
-          f.id === existingExpense.id
+          f.id === existingAdvance.id
             ? {
                 ...f,
-                amount: wageAmount,
+                amount: advanceAmount,
                 worker_id: assignedWorkerIds[0] || null,
                 date: savedTask.completed_date || savedTask.due_date || new Date().toISOString().split('T')[0],
                 updated_at: now,
@@ -531,7 +555,44 @@ class LocalDatabaseStore {
         this.financials.push({
           id: crypto.randomUUID(),
           type: 'expense',
-          amount: wageAmount,
+          amount: advanceAmount,
+          currency: 'XAF',
+          date: savedTask.completed_date || savedTask.due_date || new Date().toISOString().split('T')[0],
+          description: 'Avance sur salaire versée aux ouvriers',
+          category: 'Avance Salaire',
+          farm_id: savedTask.farm_id,
+          worker_id: assignedWorkerIds[0] || null,
+          payment_method: 'cash',
+          related_contact_id: null,
+          task_id: savedTask.id,
+          created_at: now,
+          updated_at: now,
+        });
+      }
+    } else if (existingAdvance) {
+      this.financials = this.financials.filter((f) => f.id !== existingAdvance.id);
+    }
+
+    // Salary settlement = wage MINUS the advance already paid.
+    const existingExpense = this.financials.find((f) => f.task_id === savedTask.id && f.category === 'Salaires Ouvriers');
+    if (savedTask.status !== 'cancelled' && wagePaid && netWageAmount > 0) {
+      if (existingExpense) {
+        this.financials = this.financials.map((f) =>
+          f.id === existingExpense.id
+            ? {
+                ...f,
+                amount: netWageAmount,
+                worker_id: assignedWorkerIds[0] || null,
+                date: savedTask.completed_date || savedTask.due_date || new Date().toISOString().split('T')[0],
+                updated_at: now,
+              }
+            : f
+        );
+      } else {
+        this.financials.push({
+          id: crypto.randomUUID(),
+          type: 'expense',
+          amount: netWageAmount,
           currency: 'XAF',
           date: savedTask.completed_date || savedTask.due_date || new Date().toISOString().split('T')[0],
           description: 'Paiement des salaires du personnel',

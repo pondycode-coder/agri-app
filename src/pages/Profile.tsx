@@ -17,6 +17,7 @@ import superadminSql from '../../supabase/migrations/20260809000005_superadmin.s
 import workerWagesSql from '../../supabase/migrations/20260809000006_task_worker_wages.sql?raw';
 import ensureProfileSql from '../../supabase/migrations/20260809000007_ensure_profile.sql?raw';
 import ensureProfileIdempotentSql from '../../supabase/migrations/20260809000008_ensure_profile_idempotent.sql?raw';
+import taskAdvancesSql from '../../supabase/migrations/20260809000009_task_advances.sql?raw';
 
 // The full, current schema (every migration in order) so "Copy SQL" bootstraps
 // a complete database — including workers, farm_tasks, contacts, financials, etc.
@@ -29,6 +30,7 @@ const MIGRATION_SQL = [
   workerWagesSql,
   ensureProfileSql,
   ensureProfileIdempotentSql,
+  taskAdvancesSql,
 ].join('\n\n-- ------------------------------------------------------------------\n\n');
 
 export default function Profile() {

@@ -134,6 +134,10 @@ export interface FarmTask {
   worker_id?: string | null;
   /** Per-worker wage map (worker id -> wage in FCFA). Sum equals wage_amount. */
   worker_wages?: Record<string, number>;
+  /** Per-worker advance paid up front (worker id -> FCFA). Deducted from wages. */
+  worker_advances?: Record<string, number>;
+  /** Total advance paid up front for this task (sum of worker_advances). */
+  advance_amount?: number;
   title: string;
   description?: string;
   farm_id: string;

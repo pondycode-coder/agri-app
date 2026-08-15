@@ -37,7 +37,7 @@ export default function Tasks() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<FarmTask | null>(null);
   const [form, setForm] = useState({
-    farm_id: '', title: '', description: '', worker_ids: [] as string[], worker_wages: {} as Record<string, number>, plot_id: '',
+    farm_id: '', title: '', description: '', worker_ids: [] as string[], worker_wages: {} as Record<string, number>, worker_advances: {} as Record<string, number>, plot_id: '',
     wage_amount: 0, wage_paid: false,
     status: 'pending' as FarmTask['status'], assigned_date: new Date().toISOString().split('T')[0],
     due_date: '',
@@ -63,7 +63,7 @@ export default function Tasks() {
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ farm_id: farms[0]?.id || '', title: '', description: '', worker_ids: [], worker_wages: {}, plot_id: '', wage_amount: 0, wage_paid: false, status: 'pending', assigned_date: new Date().toISOString().split('T')[0], due_date: '' });
+    setForm({ farm_id: farms[0]?.id || '', title: '', description: '', worker_ids: [], worker_wages: {}, worker_advances: {}, plot_id: '', wage_amount: 0, wage_paid: false, status: 'pending', assigned_date: new Date().toISOString().split('T')[0], due_date: '' });
     setDialogOpen(true);
   };
 
@@ -75,6 +75,12 @@ export default function Tasks() {
         : workerIds.length
           ? Object.fromEntries(workerIds.map((id) => [id, Math.round((task.wage_amount ?? 0) / workerIds.length)]))
           : {};
+    const workerAdvances =
+      task.worker_advances && Object.keys(task.worker_advances).length > 0
+        ? { ...task.worker_advances }
+        : workerIds.length
+          ? Object.fromEntries(workerIds.map((id) => [id, Math.round((task.advance_amount ?? 0) / workerIds.length)]))
+          : {};
     setEditing(task);
     setForm({
       farm_id: task.farm_id,
@@ -82,6 +88,7 @@ export default function Tasks() {
       description: task.description || '',
       worker_ids: workerIds,
       worker_wages: workerWages,
+      worker_advances: workerAdvances,
       plot_id: task.plot_id || '',
       wage_amount: task.wage_amount ?? 0,
       wage_paid: task.wage_paid ?? false,
@@ -96,12 +103,15 @@ export default function Tasks() {
     setForm((prev) => {
       const included = prev.worker_ids.includes(workerId);
       const worker_wages = { ...prev.worker_wages };
+      const worker_advances = { ...prev.worker_advances };
       if (included) {
         delete worker_wages[workerId];
-        return { ...prev, worker_ids: prev.worker_ids.filter((id) => id !== workerId), worker_wages };
+        delete worker_advances[workerId];
+        return { ...prev, worker_ids: prev.worker_ids.filter((id) => id !== workerId), worker_wages, worker_advances };
       }
       worker_wages[workerId] = 0;
-      return { ...prev, worker_ids: [...prev.worker_ids, workerId], worker_wages };
+      worker_advances[workerId] = 0;
+      return { ...prev, worker_ids: [...prev.worker_ids, workerId], worker_wages, worker_advances };
     });
   };
 
@@ -130,8 +140,12 @@ export default function Tasks() {
       id,
       name: workers.find((w) => w.id === id)?.name || '—',
       wage: task.worker_wages?.[id] != null ? task.worker_wages[id] : Math.round(total / workerIds.length),
+      advance: task.worker_advances?.[id] != null ? task.worker_advances[id] : Math.round((task.advance_amount ?? 0) / workerIds.length),
     }));
   };
+
+  const totalWages = Object.values(form.worker_wages).reduce((s, v) => s + (Number(v) || 0), 0);
+  const totalAdvances = Object.values(form.worker_advances).reduce((s, v) => s + (Number(v) || 0), 0);
 
 
   return (
@@ -156,13 +170,14 @@ export default function Tasks() {
                   <TableHead>{t('tasks.dueDate')}</TableHead>
                   <TableHead>{t('tasks.status')}</TableHead>
                   <TableHead>{t('tasks.wageAmount')}</TableHead>
+                  <TableHead>{t('tasks.advanceAmount')}</TableHead>
                   <TableHead>{t('tasks.paid')}</TableHead>
                   <TableHead className="text-right">{t('common.actions')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {tasks.length === 0 ? (
-                  <TableRow><TableCell colSpan={8} className="text-center py-8 text-slate-500">{t('common.noData')}</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={9} className="text-center py-8 text-slate-500">{t('common.noData')}</TableCell></TableRow>
                 ) : tasks.map((task) => (
                   <TableRow key={task.id}>
                     <TableCell className="font-medium">{task.title}</TableCell>
@@ -171,10 +186,13 @@ export default function Tasks() {
                         <span className="text-slate-400">—</span>
                       ) : (
                         <div className="space-y-0.5">
-                          {getWorkerWageBreakdown(task).map(({ id, name, wage }) => (
+                          {getWorkerWageBreakdown(task).map(({ id, name, wage, advance }) => (
                             <div key={id} className="flex items-center justify-between gap-3 text-sm">
                               <span>{name}</span>
-                              <span className="text-slate-500">{formatFCFA(wage)}</span>
+                              <span className="flex items-center gap-2 text-slate-500">
+                                {advance > 0 && <span className="text-amber-600">(-{formatFCFA(advance)})</span>}
+                                <span>{formatFCFA(wage)}</span>
+                              </span>
                             </div>
                           ))}
                         </div>
@@ -184,6 +202,7 @@ export default function Tasks() {
                     <TableCell>{task.due_date}</TableCell>
                     <TableCell><Badge className={statusColors[task.status] || ''}>{statusLabel(task.status)}</Badge></TableCell>
                     <TableCell>{formatFCFA(task.wage_amount ?? 0)}</TableCell>
+                    <TableCell>{formatFCFA(task.advance_amount ?? 0)}</TableCell>
                     <TableCell><Badge className={task.wage_paid ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}>{task.wage_paid ? t('tasks.paid') : t('tasks.unpaid')}</Badge></TableCell>
                     <TableCell className="text-right space-x-2">
                       <Button variant="ghost" size="icon" onClick={() => openEdit(task)}><Pencil className="h-4 w-4" /></Button>
@@ -257,14 +276,34 @@ export default function Tasks() {
                 <div>
                   <Label>Salaires par ouvrier (FCFA)</Label>
                   <div className="grid gap-2 rounded-md border border-slate-200 bg-slate-50 p-3">
+                    <div className="grid grid-cols-[1fr_110px_110px] items-center gap-2 text-xs font-medium text-slate-500">
+                      <span>Ouvrier</span>
+                      <span>{t('tasks.advance')} / {t('tasks.wageAmount')}</span>
+                    </div>
                     {form.worker_ids.map((id) => (
-                      <div key={id} className="flex items-center justify-between gap-3">
+                      <div key={id} className="grid grid-cols-[1fr_110px_110px] items-center gap-2">
                         <span className="text-sm text-slate-700">
                           {workers.find((w) => w.id === id)?.name || '—'}
                         </span>
                         <Input
                           type="number"
                           min={0}
+                          placeholder="Avance"
+                          title={t('tasks.advance')}
+                          value={form.worker_advances[id] ?? 0}
+                          onChange={(e) =>
+                            setForm((prev) => ({
+                              ...prev,
+                              worker_advances: { ...prev.worker_advances, [id]: Number(e.target.value) },
+                            }))
+                          }
+                          className="h-8"
+                        />
+                        <Input
+                          type="number"
+                          min={0}
+                          placeholder="Salaire"
+                          title={t('tasks.wageAmount')}
                           value={form.worker_wages[id] ?? 0}
                           onChange={(e) =>
                             setForm((prev) => ({
@@ -272,15 +311,23 @@ export default function Tasks() {
                               worker_wages: { ...prev.worker_wages, [id]: Number(e.target.value) },
                             }))
                           }
-                          className="w-32"
+                          className="h-8"
                         />
                       </div>
                     ))}
-                    <div className="flex items-center justify-between text-sm font-semibold text-slate-700 border-t border-slate-200 pt-2">
-                      <span>Total</span>
-                      <span>
-                        {formatFCFA(Object.values(form.worker_wages).reduce((s, v) => s + (Number(v) || 0), 0))}
-                      </span>
+                    <div className="border-t border-slate-200 pt-2 space-y-1 text-sm">
+                      <div className="flex items-center justify-between font-semibold text-slate-700">
+                        <span>{t('tasks.totalWage')}</span>
+                        <span>{formatFCFA(totalWages)}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-slate-600">
+                        <span>{t('tasks.totalAdvance')}</span>
+                        <span>{formatFCFA(totalAdvances)}</span>
+                      </div>
+                      <div className="flex items-center justify-between font-semibold text-emerald-700">
+                        <span>{t('tasks.netToPay')}</span>
+                        <span>{formatFCFA(Math.max(0, totalWages - totalAdvances))}</span>
+                      </div>
                     </div>
                   </div>
                 </div>

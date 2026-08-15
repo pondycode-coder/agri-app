@@ -381,6 +381,8 @@ export const INITIAL_TASKS: FarmTask[] = [
     plot_id: 'plot-2',
     wage_amount: 22000,
     worker_wages: { 'wrk-1': 8000, 'wrk-2': 7000, 'wrk-3': 7000 },
+    worker_advances: { 'wrk-1': 3000 },
+    advance_amount: 3000,
     wage_paid: true,
     status: 'completed',
     assigned_date: '2025-02-22',
