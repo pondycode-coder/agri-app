@@ -218,7 +218,7 @@ class LocalDatabaseStore {
       return updated;
     } else {
       const newFarm: Farm = {
-        id: 'farm-' + Date.now(),
+        id: crypto.randomUUID(),
         name: farmData.name || 'Nouvelle Ferme',
         location: farmData.location || 'Unknown region',
         plots: farmData.plots || 0,
@@ -274,7 +274,7 @@ class LocalDatabaseStore {
       return this.plots.find((p) => p.id === plotData.id)!;
     } else {
       const newPlot: Plot = {
-        id: 'plot-' + Date.now(),
+        id: crypto.randomUUID(),
         farm_id: plotData.farm_id,
         name: plotData.name || 'Nouvelle Parcelle',
         size_in_hectares: plotData.size_in_hectares || 1,
@@ -316,7 +316,7 @@ class LocalDatabaseStore {
       return this.cropCycles.find((c) => c.id === cropData.id)!;
     } else {
       const newCrop: CropCycle = {
-        id: 'crop-' + Date.now(),
+        id: crypto.randomUUID(),
         plot_id: cropData.plot_id,
         crop_name: cropData.crop_name || 'Cacao',
         variety: cropData.variety || 'Hybride',
@@ -352,7 +352,7 @@ class LocalDatabaseStore {
       return this.contacts.find((c) => c.id === contactData.id)!;
     } else {
       const newContact: Contact = {
-        id: 'contact-' + Date.now(),
+        id: crypto.randomUUID(),
         name: contactData.name || 'Nouveau Contact',
         type: contactData.type || 'customer',
         phone: contactData.phone || '+237 600000000',
@@ -384,7 +384,7 @@ class LocalDatabaseStore {
       return this.inventory.find((i) => i.id === invData.id)!;
     } else {
       const newItem: InventoryItem = {
-        id: 'inv-' + Date.now(),
+        id: crypto.randomUUID(),
         name: invData.name || 'Article Intrant',
         category: invData.category || 'input',
         quantity: invData.quantity || 1,
@@ -417,7 +417,7 @@ class LocalDatabaseStore {
       return this.workers.find((w) => w.id === workerData.id)!;
     } else {
       const newWorker: Worker = {
-        id: 'wrk-' + Date.now(),
+        id: crypto.randomUUID(),
         name: workerData.name || 'Ouvrier Agricole',
         role: workerData.role || 'field_worker',
         phone_number: workerData.phone_number || '+237 600000000',
@@ -491,7 +491,7 @@ class LocalDatabaseStore {
       savedTask = this.tasks.find((t) => t.id === taskData.id)!;
     } else {
       const newTask: FarmTask = {
-        id: 'task-' + Date.now(),
+        id: crypto.randomUUID(),
         title: taskData.title || 'Tâche Agricole',
         description: taskData.description || '',
         farm_id: taskData.farm_id,
@@ -529,7 +529,7 @@ class LocalDatabaseStore {
         );
       } else {
         this.financials.push({
-          id: 'fin-' + Date.now(),
+          id: crypto.randomUUID(),
           type: 'expense',
           amount: wageAmount,
           currency: 'XAF',
@@ -579,7 +579,7 @@ class LocalDatabaseStore {
       return this.financials.find((f) => f.id === finData.id)!;
     } else {
       const newFin: FinancialRecord = {
-        id: 'fin-' + Date.now(),
+        id: crypto.randomUUID(),
         type: finData.type || 'income',
         amount: finData.amount || 0,
         currency: 'XAF',
@@ -614,7 +614,7 @@ class LocalDatabaseStore {
       return this.investments.find((i) => i.id === invstData.id)!;
     } else {
       const newInvst: Investment = {
-        id: 'invst-' + Date.now(),
+        id: crypto.randomUUID(),
         name: invstData.name || 'Investissement Équipement',
         type: invstData.type || 'equipment',
         amount: invstData.amount || 0,
