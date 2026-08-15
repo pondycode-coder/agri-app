@@ -38,9 +38,23 @@ export class SupabaseBackend {
   async fetchAll<T>(table: EntityKey): Promise<T[]> {
     let q = supabase.from(table).select('*');
     if (this.farmId && table !== 'profiles') {
-      // `farms` is the tenant root: its primary key IS the farm id, so
-      // filter by `id`; every other table carries a farm_id column.
-      q = table === 'farms' ? q.eq('id', this.farmId) : q.eq('farm_id', this.farmId);
+      // Mirror the RLS tenant scoping per table:
+      // - `farms`: primary key IS the farm id → filter by `id`.
+      // - `crop_cycles`: has NO farm_id column; scoped via plot_id →
+      //   plots.farm_id, so it must not be filtered on a nonexistent column.
+      // - `contacts`/`investments`: farm_id is optional, so rows created
+      //   with farm_id IS NULL are allowed by RLS (coalesce) and must be
+      //   fetched back — otherwise they vanish after a reload.
+      // - everything else: carries a farm_id column.
+      if (table === 'farms') {
+        q = q.eq('id', this.farmId);
+      } else if (table === 'crop_cycles') {
+        // no farm_id column — RLS already scopes to the current farm
+      } else if (table === 'contacts' || table === 'investments') {
+        q = q.or(`farm_id.eq.${this.farmId},farm_id.is.null`);
+      } else {
+        q = q.eq('farm_id', this.farmId);
+      }
     }
     const { data, error } = await q;
     if (error) {
