@@ -249,7 +249,7 @@ class LocalDatabaseStore {
       const newProf: Profile = {
         id: profileData.id,
         email: profileData.email || '',
-        name: profileData.name || 'Utilisateur Agri',
+        name: profileData.name || 'Pondycode',
         role: profileData.role || 'worker',
         farm_id: profileData.farm_id || null,
         created_at: now,

@@ -39,7 +39,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<Profile | null>(() => {
     try {
       const stored = localStorage.getItem('agri_current_user');
-      if (stored) return JSON.parse(stored);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        // Purge stale cached profiles from previous versions
+        if (parsed?.name === 'Jean-Paul Nkoumou' || parsed?.email === 'admin@agriapp.com') {
+          localStorage.removeItem('agri_current_user');
+        } else {
+          return parsed;
+        }
+      }
     } catch (e) {
       console.error(e);
     }
