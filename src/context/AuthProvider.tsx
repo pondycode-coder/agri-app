@@ -3,7 +3,7 @@ import { toast } from 'sonner';
 import { dbStore } from '../services/store';
 import { Profile, Farm, AppRole } from '../types/database';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { activateFarm, detachFarm, listUserFarms, switchFarm as switchFarmRemote, createFarmAndSwitch, joinFarmAndSwitch, getMyProfile, ensureMyProfile } from '../lib/remoteSync';
+import { activateFarm, detachFarm, listUserFarms, switchFarm as switchFarmRemote, createFarmAndSwitch, joinFarmAndSwitch, getMyProfile, ensureMyProfile, recordAuthEvent } from '../lib/remoteSync';
 
 interface AuthContextType {
   user: Profile | null;
@@ -140,6 +140,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const userFarms = await listUserFarms();
         if (userFarms.length > 0) setFarms(userFarms);
       }
+
+      // Report the login so super admins can see who signed in and when.
+      void recordAuthEvent(profile.id, profile.email, profile.name, profile.farm_id || null, 'login');
     };
 
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -178,6 +181,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           });
         }
         setUser(match);
+        void recordAuthEvent(match.id, match.email, match.name, match.farm_id || null, 'login');
       }
     } finally {
       setLoading(false);
@@ -210,6 +214,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           farm_id: 'farm-1',
         });
         setUser(newProf);
+        void recordAuthEvent(newProf.id, newProf.email, newProf.name, newProf.farm_id || null, 'login');
       }
     } finally {
       setLoading(false);
@@ -217,6 +222,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const signOut = async () => {
+    if (user) {
+      void recordAuthEvent(user.id, user.email, user.name, user.farm_id || null, 'logout');
+    }
     detachFarm();
     if (isSupabaseConfigured()) {
       await supabase.auth.signOut();

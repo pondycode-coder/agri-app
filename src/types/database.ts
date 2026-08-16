@@ -57,6 +57,15 @@ export interface AdminStats {
   total_expenses: number;
 }
 
+export interface AuthEvent {
+  id: string;
+  user_email: string;
+  user_name: string;
+  farm_name: string | null;
+  event_type: 'login' | 'logout';
+  created_at: string;
+}
+
 export interface Plot {
   id: string;
   farm_id: string;

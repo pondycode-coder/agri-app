@@ -1,4 +1,4 @@
-import { Farm, Profile, Plot, AdminFarm, AdminUser, AdminStats } from '../types/database';
+import { Farm, Profile, Plot, AdminFarm, AdminUser, AdminStats, AuthEvent } from '../types/database';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 export type EntityKey =
@@ -291,5 +291,37 @@ export class SupabaseBackend {
     const { error } = await supabase.rpc('admin_move_user', { p_user_id: userId, p_farm_id: farmId } as never);
     if (error) console.error('[supabase] adminMoveUser:', error.message);
     return !error;
+  }
+
+  // --- auth activity log --------------------------------------------------
+
+  /** Record a login/logout event for a user (fire-and-forget). */
+  public async recordAuthEvent(
+    userId: string,
+    email: string,
+    name: string,
+    farmId: string | null,
+    eventType: 'login' | 'logout',
+  ): Promise<void> {
+    if (!this.isConfigured()) return;
+    const { error } = await supabase.rpc('record_auth_event', {
+      p_user_id: userId,
+      p_user_email: email,
+      p_user_name: name,
+      p_farm_id: farmId,
+      p_event_type: eventType,
+    } as never);
+    if (error) console.error('[supabase] recordAuthEvent:', error.message);
+  }
+
+  /** List recent auth activity for a super admin. */
+  public async adminListAuthEvents(limit = 100): Promise<AuthEvent[]> {
+    if (!this.isConfigured()) return [];
+    const { data, error } = await supabase.rpc('admin_list_auth_events', { p_limit: limit } as never);
+    if (error) {
+      console.error('[supabase] adminListAuthEvents:', error.message);
+      return [];
+    }
+    return (data || []) as AuthEvent[];
   }
 }

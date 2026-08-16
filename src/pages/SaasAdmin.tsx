@@ -22,13 +22,14 @@ import {
   adminStats,
   adminListFarms,
   adminListUsers,
+  adminListAuthEvents,
   adminSetRole,
   adminSetSuperadmin,
   adminDeleteFarm,
   adminMoveUser,
 } from '@/lib/remoteSync';
-import { AdminFarm, AdminStats, AdminUser, AppRole, formatFCFA } from '@/types/database';
-import { ShieldCheck, Building2, Users, LandPlot, ListChecks, Wallet, Trash2, RefreshCw, Ban, Check } from 'lucide-react';
+import { AdminFarm, AdminStats, AdminUser, AppRole, AuthEvent, formatFCFA } from '@/types/database';
+import { ShieldCheck, Building2, Users, LandPlot, ListChecks, Wallet, Trash2, RefreshCw, Ban, Check, LogIn, LogOut } from 'lucide-react';
 import { isSupabaseConfigured } from '@/lib/supabase';
 
 export default function SaasAdmin() {
@@ -39,13 +40,15 @@ export default function SaasAdmin() {
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [farms, setFarms] = useState<AdminFarm[]>([]);
   const [users, setUsers] = useState<AdminUser[]>([]);
+  const [events, setEvents] = useState<AuthEvent[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [s, f, u] = await Promise.all([adminStats(), adminListFarms(), adminListUsers()]);
+    const [s, f, u, e] = await Promise.all([adminStats(), adminListFarms(), adminListUsers(), adminListAuthEvents()]);
     setStats(s);
     setFarms(f);
     setUsers(u);
+    setEvents(e);
     setLoading(false);
   }, []);
 
@@ -148,6 +151,7 @@ export default function SaasAdmin() {
           <TabsList>
             <TabsTrigger value="farms">Exploitations ({farms.length})</TabsTrigger>
             <TabsTrigger value="users">Comptes ({users.length})</TabsTrigger>
+            <TabsTrigger value="activity">Activité ({events.length})</TabsTrigger>
           </TabsList>
 
           <TabsContent value="farms" className="space-y-4">
@@ -290,6 +294,55 @@ export default function SaasAdmin() {
                       <TableRow>
                         <TableCell colSpan={6} className="text-center text-slate-400 py-6">
                           Aucun compte.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="activity" className="space-y-4">
+            <Card>
+              <CardContent className="pt-6">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Utilisateur</TableHead>
+                      <TableHead>Exploitation</TableHead>
+                      <TableHead>Événement</TableHead>
+                      <TableHead>Date / Heure</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {events.map((ev) => (
+                      <TableRow key={ev.id}>
+                        <TableCell>
+                          <div className="font-medium">{ev.user_name || '—'}</div>
+                          <div className="text-xs text-slate-500">{ev.user_email}</div>
+                        </TableCell>
+                        <TableCell>{ev.farm_name || '—'}</TableCell>
+                        <TableCell>
+                          {ev.event_type === 'login' ? (
+                            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                              <LogIn className="h-3.5 w-3.5" /> Connexion
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-100 px-2 py-0.5 text-xs font-medium text-rose-700">
+                              <LogOut className="h-3.5 w-3.5" /> Déconnexion
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap text-slate-500">
+                          {new Date(ev.created_at).toLocaleString('fr-FR')}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {events.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={4} className="text-center text-slate-400 py-6">
+                          Aucune activité enregistrée.
                         </TableCell>
                       </TableRow>
                     )}

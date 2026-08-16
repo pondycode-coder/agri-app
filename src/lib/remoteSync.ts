@@ -1,6 +1,6 @@
 import { SupabaseBackend } from './supabaseBackend';
 import { dbStore } from '../services/store';
-import { Profile, Farm, AdminFarm, AdminUser, AdminStats, AppRole } from '../types/database';
+import { Profile, Farm, AdminFarm, AdminUser, AdminStats, AppRole, AuthEvent } from '../types/database';
 import {
   INITIAL_FARMS,
   INITIAL_PLOTS,
@@ -164,4 +164,27 @@ export async function adminDeleteFarm(farmId: string): Promise<boolean> {
 export async function adminMoveUser(userId: string, farmId: string): Promise<boolean> {
   if (!activeBackend?.isConfigured()) return false;
   return activeBackend.adminMoveUser(userId, farmId);
+}
+
+// --- auth activity log -----------------------------------------------------
+
+/** Report a login/logout event to the platform (best-effort, never throws). */
+export async function recordAuthEvent(
+  userId: string,
+  email: string,
+  name: string,
+  farmId: string | null,
+  eventType: 'login' | 'logout',
+): Promise<void> {
+  try {
+    const backend = activeBackend ?? new SupabaseBackend('');
+    await backend.recordAuthEvent(userId, email, name, farmId, eventType);
+  } catch (err) {
+    console.error('[remoteSync] recordAuthEvent:', err);
+  }
+}
+
+export async function adminListAuthEvents(limit = 100): Promise<AuthEvent[]> {
+  if (!activeBackend?.isConfigured()) return [];
+  return activeBackend.adminListAuthEvents(limit);
 }
