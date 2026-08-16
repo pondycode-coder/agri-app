@@ -12,6 +12,8 @@ interface AuthContextType {
   activeFarmId: string | null;
   isSuperAdmin: boolean;
   signIn: (email: string, password?: string) => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
+  signInWithX: () => Promise<void>;
   signUp: (email: string, password?: string, name?: string, role?: AppRole) => Promise<void>;
   signOut: () => Promise<void>;
   switchRole: (role: AppRole) => void;
@@ -188,6 +190,35 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const signInWithGoogle = async () => {
+    if (!isSupabaseConfigured()) {
+      toast.error('OAuth requires a Supabase connection');
+      return;
+    }
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+        queryParams: { access_type: 'offline', prompt: 'consent' },
+      },
+    });
+    if (error) throw error;
+  };
+
+  const signInWithX = async () => {
+    if (!isSupabaseConfigured()) {
+      toast.error('OAuth requires a Supabase connection');
+      return;
+    }
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'twitter',
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+      },
+    });
+    if (error) throw error;
+  };
+
   const signUp = async (email: string, _password?: string, name?: string, role: AppRole = 'admin') => {
     setLoading(true);
     try {
@@ -301,6 +332,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         activeFarmId,
         isSuperAdmin: user?.is_superadmin === true,
         signIn,
+        signInWithGoogle,
+        signInWithX,
         signUp,
         signOut,
         switchRole,
