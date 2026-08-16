@@ -138,7 +138,15 @@ class LocalDatabaseStore {
       this.farms = storedFarms ? JSON.parse(storedFarms) : INITIAL_FARMS;
 
       const storedProfiles = localStorage.getItem('agri_profiles');
-      this.profiles = storedProfiles ? JSON.parse(storedProfiles) : INITIAL_PROFILES;
+      if (storedProfiles) {
+        const parsed = JSON.parse(storedProfiles);
+        const hasStale = parsed.some((p: { name?: string; email?: string }) =>
+          p.name === 'Jean-Paul Nkoumou' || p.email === 'admin@agriapp.com'
+        );
+        this.profiles = hasStale ? INITIAL_PROFILES : parsed;
+      } else {
+        this.profiles = INITIAL_PROFILES;
+      }
 
       const storedPlots = localStorage.getItem('agri_plots');
       this.plots = storedPlots ? JSON.parse(storedPlots) : INITIAL_PLOTS;

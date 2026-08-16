@@ -344,7 +344,7 @@ export const MainLayout = ({ children }: { children: React.ReactNode }) => {
             </Badge>
             <span className="text-slate-400 text-sm">|</span>
             <span className="text-sm font-medium text-slate-600 dark:text-slate-400">
-              {user?.name || 'Exploitation Agricole'}
+              {user?.name || 'Pondycode'}
             </span>
           </div>
 
@@ -356,7 +356,7 @@ export const MainLayout = ({ children }: { children: React.ReactNode }) => {
               <p className="text-xs text-slate-500">{user?.email}</p>
             </div>
             <div className="w-9 h-9 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center text-sm shadow-sm ring-2 ring-emerald-500/30">
-              {user?.name ? user.name.charAt(0).toUpperCase() : 'A'}
+              {user?.name ? user.name.charAt(0).toUpperCase() : 'P'}
             </div>
           </div>
         </header>

@@ -85,11 +85,11 @@ export default function Profile() {
             <CardContent className="space-y-4">
               <div className="flex items-center space-x-4">
                 <div className="w-16 h-16 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center text-2xl">
-                  {user?.name ? user.name.charAt(0).toUpperCase() : 'A'}
+                  {user?.name ? user.name.charAt(0).toUpperCase() : 'P'}
                 </div>
                 <div>
-                  <p className="text-lg font-bold">{user?.name || 'Utilisateur Agri'}</p>
-                  <p className="text-sm text-slate-500">{user?.email || 'admin@agriapp.com'}</p>
+                  <p className="text-lg font-bold">{user?.name || 'Pondycode'}</p>
+                  <p className="text-sm text-slate-500">{user?.email || 'pondycode@gmail.com'}</p>
                 </div>
               </div>
               <div className="pt-2 border-t">
