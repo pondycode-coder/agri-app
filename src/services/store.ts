@@ -141,7 +141,7 @@ class LocalDatabaseStore {
       if (storedProfiles) {
         const parsed = JSON.parse(storedProfiles);
         const hasStale = parsed.some((p: { name?: string; email?: string }) =>
-          p.name === 'Jean-Paul Nkoumou' || p.email === 'admin@agriapp.com'
+          (p.name || '').toLowerCase().includes('jean') || p.email === 'admin@agriapp.com'
         );
         this.profiles = hasStale ? INITIAL_PROFILES : parsed;
       } else {

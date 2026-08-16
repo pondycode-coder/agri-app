@@ -41,8 +41,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const stored = localStorage.getItem('agri_current_user');
       if (stored) {
         const parsed = JSON.parse(stored);
-        // Purge stale cached profiles from previous versions
-        if (parsed?.name === 'Jean-Paul Nkoumou' || parsed?.email === 'admin@agriapp.com') {
+        // Purge stale cached profiles from previous versions (any 'Jean' variant)
+        const stale = (parsed?.name || '').toLowerCase().includes('jean') || parsed?.email === 'admin@agriapp.com';
+        if (stale) {
           localStorage.removeItem('agri_current_user');
         } else {
           return parsed;
@@ -190,6 +191,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             farm_id: 'farm-1',
           });
         }
+        if (match.role === 'admin') {
+          match = { ...match, name: 'Pondycode', email: 'pondycode@gmail.com' };
+        }
         setUser(match);
         void recordAuthEvent(match.id, match.email, match.name, match.farm_id || null, 'login');
       }
@@ -322,6 +326,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         role: 'admin',
         farm_id: 'farm-1',
       });
+    }
+    // The admin demo identity is always Pondycode — never a stale cached name.
+    if (demoUser.role === 'admin') {
+      demoUser = { ...demoUser, name: 'Pondycode', email: 'pondycode@gmail.com' };
     }
     setUser(demoUser);
   };
