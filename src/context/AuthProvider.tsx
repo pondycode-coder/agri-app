@@ -47,8 +47,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const profiles = dbStore.getProfiles();
     return profiles[0] || {
       id: 'user-admin-1',
-      email: 'admin@agriapp.com',
-      name: 'Jean-Paul Nkoumou',
+      email: 'pondycode@gmail.com',
+      name: 'Pondycode',
       role: 'admin',
       farm_id: 'farm-1',
       created_at: new Date().toISOString(),
@@ -176,8 +176,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (!match) {
           match = dbStore.saveProfile({
             id: 'user-' + Date.now(),
-            email,
-            name: email.split('@')[0] || 'Utilisateur Agri',
+            email: email,
+            name: email.split('@')[0] || 'Pondycode',
             role: 'admin',
             farm_id: 'farm-1',
           });
@@ -240,7 +240,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const newProf = dbStore.saveProfile({
           id: 'user-' + Date.now(),
           email,
-          name: name || email.split('@')[0] || 'Exploitant Agricole',
+          name: name || email.split('@')[0] || 'Pondycode',
           role,
           farm_id: 'farm-1',
         });
@@ -305,7 +305,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const loginAsDemo = (role: AppRole) => {
     const profiles = dbStore.getProfiles();
-    const demoUser = profiles.find((p) => p.role === role) || profiles[0];
+    let demoUser = profiles.find((p) => p.role === role) || profiles[0];
+    if (!demoUser) {
+      demoUser = dbStore.saveProfile({
+        id: 'user-admin-1',
+        email: 'pondycode@gmail.com',
+        name: 'Pondycode',
+        role: 'admin',
+        farm_id: 'farm-1',
+      });
+    }
     setUser(demoUser);
   };
 

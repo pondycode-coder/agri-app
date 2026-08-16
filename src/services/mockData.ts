@@ -47,8 +47,8 @@ export const INITIAL_FARMS: Farm[] = [
 export const INITIAL_PROFILES: Profile[] = [
   {
     id: 'user-admin-1',
-    email: 'admin@agriapp.com',
-    name: 'Jean-Paul Nkoumou',
+    email: 'pondycode@gmail.com',
+    name: 'Pondycode',
     avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
     role: 'admin',
     farm_id: 'farm-1',

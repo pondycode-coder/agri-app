@@ -8,6 +8,13 @@ import { Alert } from "@/components/ui/alert";
 import AuthShell from "@/components/AuthShell";
 import { Loader2, AlertTriangle, Eye, EyeOff, Mail, Lock } from "lucide-react";
 
+const getGreeting = () => {
+  const hour = new Date().getHours();
+  if (hour >= 6 && hour < 12) return "Bonjour";
+  if (hour >= 12 && hour < 18) return "Bon après-midi";
+  return "Bonsoir";
+};
+
 const GoogleIcon = () => (
   <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
     <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4" />
@@ -88,7 +95,7 @@ const LoginPage: React.FC = () => {
 
   return (
     <AuthShell
-      title="Welcome back"
+      title={getGreeting()}
       subtitle="Sign in to manage your farm operations"
       footer={
         <>
