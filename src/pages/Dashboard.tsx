@@ -73,9 +73,6 @@ export default function Dashboard() {
 
   const netProfit = totalIncome - totalExpenses;
 
-  // Low Stock Items
-  const lowStockItems = inventory.filter((item) => item.quantity <= 10);
-
   const totalWagesPaid = tasks
     .filter((t) => t.wage_paid)
     .reduce((sum, task) => sum + (task.wage_amount || 0), 0);
@@ -126,7 +123,7 @@ export default function Dashboard() {
         </div>
 
         {/* High Level Stat Cards Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <Card className="border-l-4 border-l-emerald-500 shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
@@ -388,44 +385,8 @@ export default function Dashboard() {
           </Card>
         </div>
 
-        {/* Low Stock Alerts & Recent Tasks */}
+        {/* Recent Tasks & Workers Overview */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Low Stock Alert List */}
-          <Card className="shadow-sm">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-base font-bold flex items-center gap-2 text-amber-700 dark:text-amber-400">
-                <AlertTriangle className="h-5 w-5 text-amber-600" />
-                {t('dashboard.lowStockAlerts')}
-              </CardTitle>
-              <Button variant="ghost" size="sm" asChild>
-                <Link to="/dashboard/inventory">Gérer Stock</Link>
-              </Button>
-            </CardHeader>
-            <CardContent className="divide-y divide-slate-100 dark:divide-slate-800">
-              {lowStockItems.length === 0 ? (
-                <p className="text-sm text-slate-500 py-4 text-center">
-                  Aucun intrant en niveau critique.
-                </p>
-              ) : (
-                lowStockItems.map((item) => (
-                  <div key={item.id} className="py-3 flex items-center justify-between">
-                    <div>
-                      <p className="font-semibold text-sm text-slate-800 dark:text-slate-200">
-                        {item.name}
-                      </p>
-                      <p className="text-xs text-slate-500">
-                        Prix: {formatFCFA(item.price_per_unit)} / {item.unit}
-                      </p>
-                    </div>
-                    <Badge variant="destructive" className="font-mono">
-                      {item.quantity} {item.unit} restant
-                    </Badge>
-                  </div>
-                ))
-              )}
-            </CardContent>
-          </Card>
-
           {/* Recent Tasks List */}
           <Card className="shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -467,56 +428,56 @@ export default function Dashboard() {
               ))}
             </CardContent>
           </Card>
-        </div>
 
-        {/* Workers Overview */}
-        <Card className="shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-base font-bold flex items-center gap-2">
-              <Users className="h-5 w-5 text-teal-600" />
-              {t('dashboard.totalWorkers')}
-            </CardTitle>
-            <Button variant="ghost" size="sm" asChild>
-              <Link to="/dashboard/workers">Gérer les ouvriers</Link>
-            </Button>
-          </CardHeader>
-          <CardContent>
-            {workers.length === 0 ? (
-              <p className="text-sm text-slate-500 py-4 text-center">Aucun ouvrier enregistré.</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Nom</TableHead>
-                      <TableHead>Rôle</TableHead>
-                      <TableHead>Téléphone</TableHead>
-                      <TableHead>Tâches</TableHead>
-                      <TableHead>Statut</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {workers.map((w) => (
-                      <TableRow key={w.id}>
-                        <TableCell className="font-medium text-slate-800 dark:text-slate-200">{w.name}</TableCell>
-                        <TableCell>
-                          <Badge variant="secondary">{roleLabels[w.role] || w.role}</Badge>
-                        </TableCell>
-                        <TableCell className="text-slate-500">{w.phone_number}</TableCell>
-                        <TableCell className="text-slate-500">{w.total_tasks_completed}</TableCell>
-                        <TableCell>
-                          <Badge className={w.is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}>
-                            {w.is_active ? 'Actif' : 'Inactif'}
-                          </Badge>
-                        </TableCell>
+          {/* Workers Overview */}
+          <Card className="shadow-sm">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-base font-bold flex items-center gap-2">
+                <Users className="h-5 w-5 text-teal-600" />
+                {t('dashboard.totalWorkers')}
+              </CardTitle>
+              <Button variant="ghost" size="sm" asChild>
+                <Link to="/dashboard/workers">Gérer les ouvriers</Link>
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {workers.length === 0 ? (
+                <p className="text-sm text-slate-500 py-4 text-center">Aucun ouvrier enregistré.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Nom</TableHead>
+                        <TableHead>Rôle</TableHead>
+                        <TableHead>Téléphone</TableHead>
+                        <TableHead>Tâches</TableHead>
+                        <TableHead>Statut</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                    </TableHeader>
+                    <TableBody>
+                      {workers.map((w) => (
+                        <TableRow key={w.id}>
+                          <TableCell className="font-medium text-slate-800 dark:text-slate-200">{w.name}</TableCell>
+                          <TableCell>
+                            <Badge variant="secondary">{roleLabels[w.role] || w.role}</Badge>
+                          </TableCell>
+                          <TableCell className="text-slate-500">{w.phone_number}</TableCell>
+                          <TableCell className="text-slate-500">{w.total_tasks_completed}</TableCell>
+                          <TableCell>
+                            <Badge className={w.is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}>
+                              {w.is_active ? 'Actif' : 'Inactif'}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </MainLayout>
   );
