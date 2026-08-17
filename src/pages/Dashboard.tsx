@@ -123,7 +123,7 @@ export default function Dashboard() {
         </div>
 
         {/* High Level Stat Cards Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card className="border-l-4 border-l-emerald-500 shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
@@ -191,7 +191,9 @@ export default function Dashboard() {
               </p>
             </CardContent>
           </Card>
+        </div>
 
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <Card className="border-l-4 border-l-indigo-500 shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
@@ -208,9 +210,7 @@ export default function Dashboard() {
               </p>
             </CardContent>
           </Card>
-        </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Card className="border-l-4 border-l-emerald-500 shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
