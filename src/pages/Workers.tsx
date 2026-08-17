@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { useI18n } from '@/context/I18nProvider';
 import { dbStore } from '@/services/store';
 import { Worker } from '@/types/database';
@@ -27,7 +28,7 @@ export default function Workers() {
   const [farms, setFarms] = useState<ReturnType<typeof dbStore.getFarms>>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Worker | null>(null);
-  const [form, setForm] = useState({ farm_id: '', name: '', role: 'field_worker' as Worker['role'], phone_number: '' });
+  const [form, setForm] = useState({ farm_id: '', name: '', role: 'field_worker' as Worker['role'], phone_number: '', is_active: true });
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -41,13 +42,13 @@ export default function Workers() {
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ farm_id: farms[0]?.id || '', name: '', role: 'field_worker', phone_number: '' });
+    setForm({ farm_id: farms[0]?.id || '', name: '', role: 'field_worker', phone_number: '', is_active: true });
     setDialogOpen(true);
   };
 
   const openEdit = (w: Worker) => {
     setEditing(w);
-    setForm({ farm_id: w.farm_id, name: w.name, role: w.role, phone_number: w.phone_number });
+    setForm({ farm_id: w.farm_id, name: w.name, role: w.role, phone_number: w.phone_number, is_active: w.is_active });
     setDialogOpen(true);
   };
 
@@ -60,6 +61,11 @@ export default function Workers() {
 
   const handleDelete = () => {
     if (deleteId) { dbStore.deleteWorker(deleteId); setDeleteId(null); toast({ title: t('common.successDeleted') }); }
+  };
+
+  const handleToggleActive = (w: Worker) => {
+    dbStore.saveWorker({ ...w, is_active: !w.is_active });
+    toast({ title: w.is_active ? t('workers.inactive') : t('workers.active') });
   };
 
   return (
@@ -97,6 +103,12 @@ export default function Workers() {
                     <TableCell>{w.total_tasks_completed}</TableCell>
                     <TableCell><Badge className={w.is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}>{w.is_active ? t('workers.active') : t('workers.inactive')}</Badge></TableCell>
                     <TableCell className="text-right space-x-2">
+                      <Switch
+                        checked={w.is_active}
+                        onCheckedChange={() => handleToggleActive(w)}
+                        aria-label={t('workers.status')}
+                        className="mr-1 data-[state=checked]:bg-emerald-600"
+                      />
                       <Button variant="ghost" size="icon" onClick={() => openEdit(w)}><Pencil className="h-4 w-4" /></Button>
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
@@ -136,6 +148,17 @@ export default function Workers() {
               </div>
               <div className="grid grid-cols-1 gap-4">
                 <div><Label>{t('workers.phone')}</Label><Input value={form.phone_number} onChange={(e) => setForm({ ...form, phone_number: e.target.value })} placeholder="+237 6XX XXX XXX" /></div>
+              </div>
+              <div className="flex items-center justify-between rounded-lg border border-slate-200 px-4 py-3">
+                <div>
+                  <Label className="font-medium">{t('workers.status')}</Label>
+                  <p className="text-xs text-slate-500">{form.is_active ? t('workers.active') : t('workers.inactive')}</p>
+                </div>
+                <Switch
+                  checked={form.is_active}
+                  onCheckedChange={(v) => setForm({ ...form, is_active: v })}
+                  className="data-[state=checked]:bg-emerald-600"
+                />
               </div>
             </div>
             <DialogFooter>
