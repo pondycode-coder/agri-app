@@ -14,7 +14,7 @@ import { formatFCFA } from '@/types/database';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Receipt, Plus, Pencil, Trash2, TrendingUp, TrendingDown } from 'lucide-react';
+import { Receipt, Plus, Pencil, Trash2, TrendingUp, TrendingDown, Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 const INCOME_CATEGORIES = ['Vente Récolte', 'Location Terrain', 'Subvention', 'Autre Revenu'];
@@ -23,7 +23,6 @@ const EXPENSE_CATEGORIES = ['Achat Intrants', 'Salaires Ouvriers', 'Carburant & 
 export default function Financials() {
   const { t } = useI18n();
   const { toast } = useToast();
-  const [, setTick] = useState(0);
   const [records, setRecords] = useState<FinancialRecord[]>([]);
   const [farms, setFarms] = useState<ReturnType<typeof dbStore.getFarms>>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -33,15 +32,31 @@ export default function Financials() {
     description: '', category: '', payment_method: 'cash' as FinancialRecord['payment_method'],
   });
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [typeFilter, setTypeFilter] = useState<'all' | FinancialRecord['type']>('all');
+  const [categoryFilter, setCategoryFilter] = useState('all');
 
   useEffect(() => {
-    const unsub = dbStore.subscribe(() => setTick((p) => p + 1));
-    setRecords(dbStore.getFinancials());
-    setFarms(dbStore.getFarms());
+    const refresh = () => {
+      setRecords(dbStore.getFinancials());
+      setFarms(dbStore.getFarms());
+    };
+    const unsub = dbStore.subscribe(refresh);
+    refresh();
     return unsub;
   }, []);
 
-  useEffect(() => { setRecords(dbStore.getFinancials()); setFarms(dbStore.getFarms()); }, [dialogOpen, deleteId]);
+  const allCategories = [...INCOME_CATEGORIES, ...EXPENSE_CATEGORIES];
+
+  const filteredRecords = records
+    .filter((r) => {
+      const q = search.trim().toLowerCase();
+      const matchesSearch = !q || r.description.toLowerCase().includes(q) || r.category.toLowerCase().includes(q);
+      const matchesType = typeFilter === 'all' || r.type === typeFilter;
+      const matchesCategory = categoryFilter === 'all' || r.category === categoryFilter;
+      return matchesSearch && matchesType && matchesCategory;
+    })
+    .sort((a, b) => b.date.localeCompare(a.date));
 
   const totalIncome = records.filter((r) => r.type === 'income').reduce((s, r) => s + r.amount, 0);
   const totalExpense = records.filter((r) => r.type === 'expense').reduce((s, r) => s + r.amount, 0);
@@ -113,6 +128,32 @@ export default function Financials() {
 
         <Card>
           <CardContent className="p-0">
+            <div className="flex flex-col sm:flex-row gap-3 p-4 border-b">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <Input
+                  placeholder={t('common.searchPlaceholder')}
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v as typeof typeFilter)}>
+                <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t('common.filterAll')}</SelectItem>
+                  <SelectItem value="income">{t('financials.income')}</SelectItem>
+                  <SelectItem value="expense">{t('financials.expense')}</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                <SelectTrigger className="w-52"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t('common.filterAll')}</SelectItem>
+                  {allCategories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -126,9 +167,9 @@ export default function Financials() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {records.length === 0 ? (
+                {filteredRecords.length === 0 ? (
                   <TableRow><TableCell colSpan={7} className="text-center py-8 text-slate-500">{t('common.noData')}</TableCell></TableRow>
-                ) : records.sort((a, b) => b.date.localeCompare(a.date)).map((rec) => (
+                ) : filteredRecords.map((rec) => (
                   <TableRow key={rec.id}>
                     <TableCell>{rec.date}</TableCell>
                     <TableCell><Badge className={rec.type === 'income' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}>{rec.type === 'income' ? t('financials.income') : t('financials.expense')}</Badge></TableCell>
