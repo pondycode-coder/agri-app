@@ -13,7 +13,7 @@ import { formatFCFA } from '@/types/database';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Package, Plus, Pencil, Trash2, AlertTriangle } from 'lucide-react';
+import { Package, Plus, Pencil, Trash2, AlertTriangle, Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 const catLabels: Record<string, string> = {
@@ -23,22 +23,31 @@ const catLabels: Record<string, string> = {
 export default function Inventory() {
   const { t } = useI18n();
   const { toast } = useToast();
-  const [, setTick] = useState(0);
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [farms, setFarms] = useState<ReturnType<typeof dbStore.getFarms>>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<InventoryItem | null>(null);
   const [form, setForm] = useState({ farm_id: '', name: '', category: 'input' as InventoryItem['category'], quantity: 0, unit: 'sacs', price_per_unit: 0 });
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState<'all' | InventoryItem['category']>('all');
 
   useEffect(() => {
-    const unsub = dbStore.subscribe(() => setTick((p) => p + 1));
-    setItems(dbStore.getInventory());
-    setFarms(dbStore.getFarms());
+    const refresh = () => {
+      setItems(dbStore.getInventory());
+      setFarms(dbStore.getFarms());
+    };
+    const unsub = dbStore.subscribe(refresh);
+    refresh();
     return unsub;
   }, []);
 
-  useEffect(() => { setItems(dbStore.getInventory()); setFarms(dbStore.getFarms()); }, [dialogOpen, deleteId]);
+  const filteredItems = items.filter((item) => {
+    const q = search.trim().toLowerCase();
+    const matchesSearch = !q || item.name.toLowerCase().includes(q);
+    const matchesCategory = categoryFilter === 'all' || item.category === categoryFilter;
+    return matchesSearch && matchesCategory;
+  });
 
   const openCreate = () => {
     setEditing(null);
@@ -85,6 +94,24 @@ export default function Inventory() {
 
         <Card>
           <CardContent className="p-0">
+            <div className="flex flex-col sm:flex-row gap-3 p-4 border-b">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <Input
+                  placeholder={t('common.searchPlaceholder')}
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              <Select value={categoryFilter} onValueChange={(v) => setCategoryFilter(v as typeof categoryFilter)}>
+                <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t('common.filterAll')}</SelectItem>
+                  {Object.entries(catLabels).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -97,9 +124,9 @@ export default function Inventory() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {items.length === 0 ? (
+                {filteredItems.length === 0 ? (
                   <TableRow><TableCell colSpan={6} className="text-center py-8 text-slate-500">{t('common.noData')}</TableCell></TableRow>
-                ) : items.map((item) => (
+                ) : filteredItems.map((item) => (
                   <TableRow key={item.id}>
                     <TableCell className="font-medium">{item.name}</TableCell>
                     <TableCell><Badge variant="secondary">{catLabels[item.category] || item.category}</Badge></TableCell>

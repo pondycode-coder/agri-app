@@ -15,7 +15,7 @@ import { FarmTask } from '@/types/database';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { CheckSquare, Plus, Pencil, Trash2, ChevronDown } from 'lucide-react';
+import { CheckSquare, Plus, Pencil, Trash2, ChevronDown, Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { formatFCFA } from '@/types/database';
 
@@ -43,6 +43,8 @@ export default function Tasks() {
     due_date: '',
   });
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | FarmTask['status']>('all');
 
   const refresh = () => {
     setTasks(dbStore.getTasks());
@@ -147,6 +149,14 @@ export default function Tasks() {
   const totalWages = Object.values(form.worker_wages).reduce((s, v) => s + (Number(v) || 0), 0);
   const totalAdvances = Object.values(form.worker_advances).reduce((s, v) => s + (Number(v) || 0), 0);
 
+  const filteredTasks = tasks.filter((task) => {
+    const q = search.trim().toLowerCase();
+    const workerNames = getWorkerWageBreakdown(task).map((w) => w.name.toLowerCase()).join(' ');
+    const matchesSearch = !q || task.title.toLowerCase().includes(q) || workerNames.includes(q);
+    const matchesStatus = statusFilter === 'all' || task.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
+
 
   return (
     <MainLayout>
@@ -161,6 +171,27 @@ export default function Tasks() {
 
         <Card>
           <CardContent className="p-0">
+            <div className="flex flex-col sm:flex-row gap-3 p-4 border-b">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <Input
+                  placeholder={t('common.searchPlaceholder')}
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as typeof statusFilter)}>
+                <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t('common.filterAll')}</SelectItem>
+                  <SelectItem value="pending">{t('tasks.statusPending')}</SelectItem>
+                  <SelectItem value="in_progress">{t('tasks.statusInProgress')}</SelectItem>
+                  <SelectItem value="completed">{t('tasks.statusCompleted')}</SelectItem>
+                  <SelectItem value="cancelled">{t('tasks.statusCancelled')}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -176,9 +207,9 @@ export default function Tasks() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {tasks.length === 0 ? (
+                {filteredTasks.length === 0 ? (
                   <TableRow><TableCell colSpan={9} className="text-center py-8 text-slate-500">{t('common.noData')}</TableCell></TableRow>
-                ) : tasks.map((task) => (
+                ) : filteredTasks.map((task) => (
                   <TableRow key={task.id}>
                     <TableCell className="font-medium">{task.title}</TableCell>
                     <TableCell>

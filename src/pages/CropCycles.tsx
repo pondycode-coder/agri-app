@@ -13,7 +13,7 @@ import { formatFCFA } from '@/types/database';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Sprout, Plus, Pencil, Trash2 } from 'lucide-react';
+import { Sprout, Plus, Pencil, Trash2, Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 const statusColors: Record<string, string> = {
@@ -26,7 +26,6 @@ const statusColors: Record<string, string> = {
 export default function CropCycles() {
   const { t } = useI18n();
   const { toast } = useToast();
-  const [, setTick] = useState(0);
   const [crops, setCrops] = useState<CropCycle[]>([]);
   const [plots, setPlots] = useState<ReturnType<typeof dbStore.getPlots>>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -36,18 +35,25 @@ export default function CropCycles() {
     status: 'planted' as CropCycle['status'], estimated_cost_fcfa: 0, revenue_fcfa: 0,
   });
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | CropCycle['status']>('all');
 
   useEffect(() => {
-    const unsub = dbStore.subscribe(() => setTick((p) => p + 1));
-    setCrops(dbStore.getCropCycles());
-    setPlots(dbStore.getPlots());
+    const refresh = () => {
+      setCrops(dbStore.getCropCycles());
+      setPlots(dbStore.getPlots());
+    };
+    const unsub = dbStore.subscribe(refresh);
+    refresh();
     return unsub;
   }, []);
 
-  useEffect(() => {
-    setCrops(dbStore.getCropCycles());
-    setPlots(dbStore.getPlots());
-  }, [dialogOpen, deleteId]);
+  const filteredCrops = crops.filter((c) => {
+    const q = search.trim().toLowerCase();
+    const matchesSearch = !q || c.crop_name.toLowerCase().includes(q) || c.variety.toLowerCase().includes(q) || c.season.toLowerCase().includes(q);
+    const matchesStatus = statusFilter === 'all' || c.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
 
   const openCreate = () => {
     setEditingCrop(null);
@@ -90,6 +96,27 @@ export default function CropCycles() {
 
         <Card>
           <CardContent className="p-0">
+            <div className="flex flex-col sm:flex-row gap-3 p-4 border-b">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <Input
+                  placeholder={t('common.searchPlaceholder')}
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as typeof statusFilter)}>
+                <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t('common.filterAll')}</SelectItem>
+                  <SelectItem value="planted">{t('crops.statusPlanted')}</SelectItem>
+                  <SelectItem value="growing">{t('crops.statusGrowing')}</SelectItem>
+                  <SelectItem value="harvested">{t('crops.statusHarvested')}</SelectItem>
+                  <SelectItem value="failed">{t('crops.statusFailed')}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -103,9 +130,9 @@ export default function CropCycles() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {crops.length === 0 ? (
+                {filteredCrops.length === 0 ? (
                   <TableRow><TableCell colSpan={7} className="text-center py-8 text-slate-500">{t('common.noData')}</TableCell></TableRow>
-                ) : crops.map((crop) => (
+                ) : filteredCrops.map((crop) => (
                   <TableRow key={crop.id}>
                     <TableCell className="font-medium">{crop.crop_name}</TableCell>
                     <TableCell>{crop.variety}</TableCell>

@@ -3,6 +3,7 @@ import { MainLayout } from '@/components/MainLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useI18n } from '@/context/I18nProvider';
 import { dbStore } from '@/services/store';
 import { formatFCFA } from '@/types/database';
@@ -18,6 +19,7 @@ import {
   AlertTriangle,
   ArrowRight,
   BarChart3,
+  Users,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -36,6 +38,10 @@ export default function Dashboard() {
   const { t } = useI18n();
   const [, setTick] = useState(0);
 
+  const roleLabels: Record<string, string> = {
+    field_worker: 'Ouvrier', agronomist: 'Agronome', machine_operator: 'Conducteur', supervisor: 'Chef d\'équipe',
+  };
+
   useEffect(() => {
     return dbStore.subscribe(() => setTick((prev) => prev + 1));
   }, []);
@@ -47,6 +53,9 @@ export default function Dashboard() {
   const workers = dbStore.getWorkers();
   const tasks = dbStore.getTasks();
   const financials = dbStore.getFinancials();
+
+  const activeWorkersCount = workers.filter((w) => w.is_active).length;
+  const inactiveWorkersCount = workers.length - activeWorkersCount;
 
   // Calculations
   const activeCropsCount = crops.filter((c) => c.status === 'planted' || c.status === 'growing').length;
@@ -165,6 +174,23 @@ export default function Dashboard() {
               </div>
               <p className="text-xs text-slate-500 mt-1">
                 {workers.length} {t('dashboard.totalWorkers').toLowerCase()}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-l-4 border-l-teal-500 shadow-sm">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                {t('dashboard.totalWorkers')}
+              </CardTitle>
+              <Users className="h-5 w-5 text-teal-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-slate-900 dark:text-white">
+                {workers.length}
+              </div>
+              <p className="text-xs text-slate-500 mt-1">
+                {activeWorkersCount} actifs · {inactiveWorkersCount} inactifs
               </p>
             </CardContent>
           </Card>
@@ -442,6 +468,55 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Workers Overview */}
+        <Card className="shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-base font-bold flex items-center gap-2">
+              <Users className="h-5 w-5 text-teal-600" />
+              {t('dashboard.totalWorkers')}
+            </CardTitle>
+            <Button variant="ghost" size="sm" asChild>
+              <Link to="/dashboard/workers">Gérer les ouvriers</Link>
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {workers.length === 0 ? (
+              <p className="text-sm text-slate-500 py-4 text-center">Aucun ouvrier enregistré.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Nom</TableHead>
+                      <TableHead>Rôle</TableHead>
+                      <TableHead>Téléphone</TableHead>
+                      <TableHead>Tâches</TableHead>
+                      <TableHead>Statut</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {workers.map((w) => (
+                      <TableRow key={w.id}>
+                        <TableCell className="font-medium text-slate-800 dark:text-slate-200">{w.name}</TableCell>
+                        <TableCell>
+                          <Badge variant="secondary">{roleLabels[w.role] || w.role}</Badge>
+                        </TableCell>
+                        <TableCell className="text-slate-500">{w.phone_number}</TableCell>
+                        <TableCell className="text-slate-500">{w.total_tasks_completed}</TableCell>
+                        <TableCell>
+                          <Badge className={w.is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}>
+                            {w.is_active ? 'Actif' : 'Inactif'}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </MainLayout>
   );

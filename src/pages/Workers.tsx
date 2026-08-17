@@ -13,7 +13,7 @@ import { Worker } from '@/types/database';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Users, Plus, Pencil, Trash2 } from 'lucide-react';
+import { Users, Plus, Pencil, Trash2, Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 const roleLabels: Record<string, string> = {
@@ -23,22 +23,25 @@ const roleLabels: Record<string, string> = {
 export default function Workers() {
   const { t } = useI18n();
   const { toast } = useToast();
-  const [, setTick] = useState(0);
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [farms, setFarms] = useState<ReturnType<typeof dbStore.getFarms>>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Worker | null>(null);
   const [form, setForm] = useState({ farm_id: '', name: '', role: 'field_worker' as Worker['role'], phone_number: '', is_active: true });
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [roleFilter, setRoleFilter] = useState<'all' | Worker['role']>('all');
 
   useEffect(() => {
-    const unsub = dbStore.subscribe(() => setTick((p) => p + 1));
-    setWorkers(dbStore.getWorkers());
-    setFarms(dbStore.getFarms());
+    const refresh = () => {
+      setWorkers(dbStore.getWorkers());
+      setFarms(dbStore.getFarms());
+    };
+    const unsub = dbStore.subscribe(refresh);
+    refresh();
     return unsub;
   }, []);
-
-  useEffect(() => { setWorkers(dbStore.getWorkers()); setFarms(dbStore.getFarms()); }, [dialogOpen, deleteId]);
 
   const openCreate = () => {
     setEditing(null);
@@ -68,6 +71,14 @@ export default function Workers() {
     toast({ title: w.is_active ? t('workers.inactive') : t('workers.active') });
   };
 
+  const filteredWorkers = workers.filter((w) => {
+    const q = search.trim().toLowerCase();
+    const matchesSearch = !q || w.name.toLowerCase().includes(q) || w.phone_number.toLowerCase().includes(q);
+    const matchesStatus = statusFilter === 'all' || (statusFilter === 'active' ? w.is_active : !w.is_active);
+    const matchesRole = roleFilter === 'all' || w.role === roleFilter;
+    return matchesSearch && matchesStatus && matchesRole;
+  });
+
   return (
     <MainLayout>
       <div className="space-y-6">
@@ -81,6 +92,34 @@ export default function Workers() {
 
         <Card>
           <CardContent className="p-0">
+            <div className="flex flex-col sm:flex-row gap-3 p-4 border-b">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <Input
+                  placeholder={t('common.searchPlaceholder')}
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              <div className="flex gap-3">
+                <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as typeof statusFilter)}>
+                  <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{t('common.filterAll')}</SelectItem>
+                    <SelectItem value="active">{t('workers.active')}</SelectItem>
+                    <SelectItem value="inactive">{t('workers.inactive')}</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={roleFilter} onValueChange={(v) => setRoleFilter(v as typeof roleFilter)}>
+                  <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{t('common.filterAll')}</SelectItem>
+                    {Object.entries(roleLabels).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -93,9 +132,9 @@ export default function Workers() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {workers.length === 0 ? (
+                {filteredWorkers.length === 0 ? (
                   <TableRow><TableCell colSpan={7} className="text-center py-8 text-slate-500">{t('common.noData')}</TableCell></TableRow>
-                ) : workers.map((w) => (
+                ) : filteredWorkers.map((w) => (
                   <TableRow key={w.id}>
                     <TableCell className="font-medium">{w.name}</TableCell>
                     <TableCell><Badge variant="secondary">{roleLabels[w.role] || w.role}</Badge></TableCell>

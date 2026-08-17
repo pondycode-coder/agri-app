@@ -13,7 +13,7 @@ import { Contact } from '@/types/database';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { BookUser, Plus, Pencil, Trash2 } from 'lucide-react';
+import { BookUser, Plus, Pencil, Trash2, Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 const typeLabels: Record<string, string> = {
@@ -23,20 +23,27 @@ const typeLabels: Record<string, string> = {
 export default function Contacts() {
   const { t } = useI18n();
   const { toast } = useToast();
-  const [, setTick] = useState(0);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Contact | null>(null);
   const [form, setForm] = useState({ name: '', type: 'customer' as Contact['type'], phone: '', email: '', address: '', notes: '' });
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [typeFilter, setTypeFilter] = useState<'all' | Contact['type']>('all');
 
   useEffect(() => {
-    const unsub = dbStore.subscribe(() => setTick((p) => p + 1));
-    setContacts(dbStore.getContacts());
+    const refresh = () => setContacts(dbStore.getContacts());
+    const unsub = dbStore.subscribe(refresh);
+    refresh();
     return unsub;
   }, []);
 
-  useEffect(() => { setContacts(dbStore.getContacts()); }, [dialogOpen, deleteId]);
+  const filteredContacts = contacts.filter((c) => {
+    const q = search.trim().toLowerCase();
+    const matchesSearch = !q || c.name.toLowerCase().includes(q) || c.email?.toLowerCase().includes(q) || c.phone.toLowerCase().includes(q);
+    const matchesType = typeFilter === 'all' || c.type === typeFilter;
+    return matchesSearch && matchesType;
+  });
 
   const openCreate = () => {
     setEditing(null);
@@ -77,6 +84,26 @@ export default function Contacts() {
 
         <Card>
           <CardContent className="p-0">
+            <div className="flex flex-col sm:flex-row gap-3 p-4 border-b">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <Input
+                  placeholder={t('common.searchPlaceholder')}
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v as typeof typeFilter)}>
+                <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t('common.filterAll')}</SelectItem>
+                  <SelectItem value="customer">{t('contacts.typeCustomer')}</SelectItem>
+                  <SelectItem value="supplier">{t('contacts.typeSupplier')}</SelectItem>
+                  <SelectItem value="partner">{t('contacts.typePartner')}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -89,9 +116,9 @@ export default function Contacts() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {contacts.length === 0 ? (
+                {filteredContacts.length === 0 ? (
                   <TableRow><TableCell colSpan={6} className="text-center py-8 text-slate-500">{t('common.noData')}</TableCell></TableRow>
-                ) : contacts.map((c) => (
+                ) : filteredContacts.map((c) => (
                   <TableRow key={c.id}>
                     <TableCell className="font-medium">{c.name}</TableCell>
                     <TableCell><Badge className={typeBadgeColor[c.type] || ''}>{typeLabels[c.type] || c.type}</Badge></TableCell>
