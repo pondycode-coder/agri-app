@@ -73,13 +73,19 @@ export default function Dashboard() {
 
   const netProfit = totalIncome - totalExpenses;
 
-  const totalWagesPaid = tasks
-    .filter((t) => t.wage_paid)
-    .reduce((sum, task) => sum + (task.wage_amount || 0), 0);
+  const totalWagesPaid =
+    tasks
+      .filter((t) => t.status !== 'cancelled')
+      .reduce((sum, task) => sum + (task.advance_amount || 0), 0) +
+    tasks
+      .filter((t) => t.wage_paid)
+      .reduce((sum, task) => sum + Math.max(0, (task.wage_amount || 0) - (task.advance_amount || 0)), 0);
 
   const totalWagesPending = tasks
-    .filter((t) => !t.wage_paid)
-    .reduce((sum, task) => sum + (task.wage_amount || 0), 0);
+    .filter((t) => !t.wage_paid && t.status !== 'cancelled')
+    .reduce((sum, task) => sum + Math.max(0, (task.wage_amount || 0) - (task.advance_amount || 0)), 0);
+
+  const recentTasks = [...tasks].sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
 
   // Financial Chart Data
   const chartData = [
@@ -399,7 +405,7 @@ export default function Dashboard() {
               </Button>
             </CardHeader>
             <CardContent className="divide-y divide-slate-100 dark:divide-slate-800">
-              {tasks.slice(0, 4).map((task) => (
+              {recentTasks.slice(0, 4).map((task) => (
                 <div key={task.id} className="py-3 flex items-center justify-between">
                   <div className="space-y-0.5 max-w-[70%]">
                     <p className="font-semibold text-sm text-slate-800 dark:text-slate-200 truncate">

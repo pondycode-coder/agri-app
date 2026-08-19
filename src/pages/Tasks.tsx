@@ -149,13 +149,15 @@ export default function Tasks() {
   const totalWages = Object.values(form.worker_wages).reduce((s, v) => s + (Number(v) || 0), 0);
   const totalAdvances = Object.values(form.worker_advances).reduce((s, v) => s + (Number(v) || 0), 0);
 
-  const filteredTasks = tasks.filter((task) => {
-    const q = search.trim().toLowerCase();
-    const workerNames = getWorkerWageBreakdown(task).map((w) => w.name.toLowerCase()).join(' ');
-    const matchesSearch = !q || task.title.toLowerCase().includes(q) || workerNames.includes(q);
-    const matchesStatus = statusFilter === 'all' || task.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+  const filteredTasks = tasks
+    .filter((task) => {
+      const q = search.trim().toLowerCase();
+      const workerNames = getWorkerWageBreakdown(task).map((w) => w.name.toLowerCase()).join(' ');
+      const matchesSearch = !q || task.title.toLowerCase().includes(q) || workerNames.includes(q);
+      const matchesStatus = statusFilter === 'all' || task.status === statusFilter;
+      return matchesSearch && matchesStatus;
+    })
+    .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
 
 
   return (
