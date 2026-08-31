@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { dbStore } from '../services/store';
 import { Profile, Farm, AppRole } from '../types/database';
-import { hashPin, verifyPin } from '../lib/pinAuth';
+import { hashPin, verifyPin, pinToSecret } from '../lib/pinAuth';
 import { activateFarm, detachFarm, listUserFarms, switchFarm as switchFarmRemote, createFarmAndSwitch, joinFarmAndSwitch, setMyPin, getMyProfile, ensureMyProfile } from '../lib/remoteSync';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
@@ -82,7 +82,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setLoading(true);
     try {
       if (isSupabaseConfigured()) {
-        const { error } = await supabase.auth.signInWithPassword({ email, password: pin });
+        const { error } = await supabase.auth.signInWithPassword({ email, password: pinToSecret(pin) });
         if (error) {
           const msg = (error.message || '').toLowerCase();
           if (msg.includes('invalid login') || msg.includes('invalid credentials')) {
@@ -142,7 +142,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         // giving a real session so RLS lets the app read their data.
         const { error: su } = await supabase.auth.signUp({
           email,
-          password: pin,
+          password: pinToSecret(pin),
           options: { data: { name: name || email.split('@')[0], role } },
         });
         if (su) {
