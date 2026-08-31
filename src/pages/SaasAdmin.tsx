@@ -27,15 +27,14 @@ import {
   adminSetSuperadmin,
   adminDeleteFarm,
   adminMoveUser,
+  adminSetPin,
 } from '@/lib/remoteSync';
 import { AdminFarm, AdminStats, AdminUser, AppRole, AuthEvent, formatFCFA } from '@/types/database';
-import { ShieldCheck, Building2, Users, LandPlot, ListChecks, Wallet, Trash2, RefreshCw, Ban, Check, LogIn, LogOut, Key } from 'lucide-react';
+import { ShieldCheck, Building2, Users, LandPlot, ListChecks, Wallet, Trash2, RefreshCw, Ban, Check, LogIn, LogOut, Key, Edit3 } from 'lucide-react';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { PinInput } from '@/components/PinInput';
-import { hashPin } from '@/lib/pinAuth';
-import { dbStore } from '@/services/store';
 
 export default function SaasAdmin() {
   const { user } = useAuth();
@@ -98,10 +97,14 @@ export default function SaasAdmin() {
     if (!pinTargetUser || newPin.length !== 4) return;
     setPinSaving(true);
     try {
-      const hash = await hashPin(newPin);
-      dbStore.saveProfilePin(pinTargetUser.id, hash);
-      toast({ title: `PIN mis à jour pour ${pinTargetUser.name}` });
-      setPinDialogOpen(false);
+      const ok = await adminSetPin(pinTargetUser.id, newPin);
+      if (ok) {
+        toast({ title: `PIN mis à jour pour ${pinTargetUser.name}` });
+        setPinDialogOpen(false);
+        await load();
+      } else {
+        toast({ title: 'Action refusée', variant: 'destructive' });
+      }
     } finally {
       setPinSaving(false);
     }
@@ -317,16 +320,21 @@ export default function SaasAdmin() {
                           </Button>
                         </TableCell>
                         <TableCell>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-8 text-xs"
-                            onClick={() => openPinDialog(u.id, u.name || u.email)}
-                            disabled={busy}
-                          >
-                            <Key className="h-3.5 w-3.5 mr-1" />
-                            Définir PIN
-                          </Button>
+                          <div className="flex items-center gap-2">
+                            <span className={`font-mono font-semibold ${u.pin ? 'text-slate-800 dark:text-slate-200' : 'text-slate-400'}`}>
+                              {u.pin ?? '—'}
+                            </span>
+                            <Button
+                              size="sm"
+                              variant={u.pin ? 'ghost' : 'outline'}
+                              className="h-8 text-xs"
+                              onClick={() => openPinDialog(u.id, u.name || u.email)}
+                              disabled={busy}
+                            >
+                              {u.pin ? <Edit3 className="h-3.5 w-3.5 mr-1" /> : <Key className="h-3.5 w-3.5 mr-1" />}
+                              {u.pin ? 'Modifier' : 'Définir'}
+                            </Button>
+                          </div>
                         </TableCell>
                         <TableCell>{new Date(u.created_at).toLocaleDateString('fr-FR')}</TableCell>
                       </TableRow>

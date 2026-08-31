@@ -2,7 +2,8 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { dbStore } from '../services/store';
 import { Profile, Farm, AppRole } from '../types/database';
 import { hashPin, verifyPin } from '../lib/pinAuth';
-import { activateFarm, detachFarm, listUserFarms, switchFarm as switchFarmRemote, createFarmAndSwitch, joinFarmAndSwitch } from '../lib/remoteSync';
+import { activateFarm, detachFarm, listUserFarms, switchFarm as switchFarmRemote, createFarmAndSwitch, joinFarmAndSwitch, signInWithPin, setMyPin } from '../lib/remoteSync';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 interface AuthContextType {
   user: Profile | null;
@@ -80,23 +81,35 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signIn = async (email: string, pin: string) => {
     setLoading(true);
     try {
-      const profile = dbStore.getProfileByEmail(email);
-      if (!profile) {
-        throw new Error('Aucun compte trouvé avec cet email.');
-      }
-      if (!profile.pin_hash) {
-        throw new Error('Aucun PIN configuré pour ce compte. Contactez l\'administrateur.');
-      }
-      const valid = await verifyPin(pin, profile.pin_hash);
-      if (!valid) {
-        throw new Error('PIN incorrect.');
-      }
-      setUser(profile);
-      if (profile.farm_id) {
-        setActiveFarmId(profile.farm_id);
-        await activateFarm(profile);
-        const userFarms = await listUserFarms();
-        if (userFarms.length > 0) setFarms(userFarms);
+      if (isSupabaseConfigured()) {
+        const profile = await signInWithPin(email, pin);
+        if (!profile) throw new Error('Connexion impossible.');
+        setUser(profile);
+        if (profile.farm_id) {
+          setActiveFarmId(profile.farm_id);
+          await activateFarm(profile);
+          const userFarms = await listUserFarms();
+          if (userFarms.length > 0) setFarms(userFarms);
+        }
+      } else {
+        const profile = dbStore.getProfileByEmail(email);
+        if (!profile) {
+          throw new Error('Aucun compte trouvé avec cet email.');
+        }
+        if (!profile.pin_hash) {
+          throw new Error('Aucun PIN configuré pour ce compte. Contactez l\'administrateur.');
+        }
+        const valid = await verifyPin(pin, profile.pin_hash);
+        if (!valid) {
+          throw new Error('PIN incorrect.');
+        }
+        setUser(profile);
+        if (profile.farm_id) {
+          setActiveFarmId(profile.farm_id);
+          await activateFarm(profile);
+          const userFarms = await listUserFarms();
+          if (userFarms.length > 0) setFarms(userFarms);
+        }
       }
     } finally {
       setLoading(false);
@@ -106,28 +119,48 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signUp = async (email: string, pin: string, name: string, role: AppRole = 'admin') => {
     setLoading(true);
     try {
-      const existing = dbStore.getProfileByEmail(email);
-      if (existing) {
-        throw new Error('Un compte avec cet email existe déjà.');
-      }
       if (!/^\d{4}$/.test(pin)) {
         throw new Error('Le PIN doit contenir exactement 4 chiffres.');
       }
-      const pinHash = await hashPin(pin);
-      const newProf = dbStore.saveProfile({
-        id: 'user-' + Date.now(),
-        email,
-        name: name || email.split('@')[0],
-        role,
-        farm_id: 'farm-1',
-        pin_hash: pinHash,
-      });
-      setUser(newProf);
-      if (newProf.farm_id) {
-        setActiveFarmId(newProf.farm_id);
-        await activateFarm(newProf);
-        const userFarms = await listUserFarms();
-        if (userFarms.length > 0) setFarms(userFarms);
+      if (isSupabaseConfigured()) {
+        // Create the Supabase auth user (its trigger creates the DB profile
+        // row), then attach the PIN so the user can sign in with it.
+        const { error } = await supabase.auth.signUp({
+          email,
+          password: '!agriapp-pin-' + Date.now(),
+          options: { data: { name, role } },
+        });
+        if (error) {
+          const code = error.code || '';
+          const msg = error.message.toLowerCase();
+          if (code === 'user_already_exists' || msg.includes('already') || msg.includes('exists')) {
+            throw new Error('Un compte avec cet email existe déjà.');
+          }
+          throw error;
+        }
+        const pinned = await setMyPin(pin);
+        if (!pinned) throw new Error('Impossible d\'enregistrer votre PIN.');
+      } else {
+        const existing = dbStore.getProfileByEmail(email);
+        if (existing) {
+          throw new Error('Un compte avec cet email existe déjà.');
+        }
+        const pinHash = await hashPin(pin);
+        const newProf = dbStore.saveProfile({
+          id: 'user-' + Date.now(),
+          email,
+          name: name || email.split('@')[0],
+          role,
+          farm_id: 'farm-1',
+          pin_hash: pinHash,
+        });
+        setUser(newProf);
+        if (newProf.farm_id) {
+          setActiveFarmId(newProf.farm_id);
+          await activateFarm(newProf);
+          const userFarms = await listUserFarms();
+          if (userFarms.length > 0) setFarms(userFarms);
+        }
       }
     } finally {
       setLoading(false);

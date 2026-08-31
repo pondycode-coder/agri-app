@@ -45,6 +45,7 @@ export interface AdminUser {
   farm_id: string | null;
   farm_name: string | null;
   is_superadmin: boolean;
+  pin?: string | null;
   created_at: string;
 }
 

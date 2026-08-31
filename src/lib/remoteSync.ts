@@ -166,6 +166,26 @@ export async function adminMoveUser(userId: string, farmId: string): Promise<boo
   return activeBackend.adminMoveUser(userId, farmId);
 }
 
+// --- PIN auth -----------------------------------------------------
+
+/** Verify email + PIN against the DB and return the profile row (Supabase only). */
+export async function signInWithPin(email: string, pin: string): Promise<Profile | null> {
+  const backend = activeBackend ?? new SupabaseBackend('');
+  return backend.signInWithPin(email, pin);
+}
+
+/** Set or change the signed-in user's own PIN (Supabase only). */
+export async function setMyPin(pin: string): Promise<boolean> {
+  const backend = activeBackend ?? new SupabaseBackend('');
+  return backend.setMyPin(pin);
+}
+
+/** Super-admin sets/resets any user's PIN (Supabase only). */
+export async function adminSetPin(userId: string, pin: string): Promise<boolean> {
+  if (!activeBackend?.isConfigured()) return false;
+  return activeBackend.adminSetPin(userId, pin);
+}
+
 // --- auth activity log -----------------------------------------------------
 
 /** Report a login/logout event to the platform (best-effort, never throws). */

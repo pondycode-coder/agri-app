@@ -293,6 +293,39 @@ export class SupabaseBackend {
     return !error;
   }
 
+  // --- PIN auth -------------------------------------------------------------
+
+  /** Verify email + PIN against the DB and return the profile row. */
+  public async signInWithPin(email: string, pin: string): Promise<Profile | null> {
+    if (!this.isConfigured()) return null;
+    const { data, error } = await supabase.rpc('sign_in_with_pin', { p_email: email, p_pin: pin } as never);
+    if (error) {
+      console.error('[supabase] signInWithPin:', error.message);
+      const msg = (error.message || '').toLowerCase();
+      if (msg.includes('account_not_found')) throw new Error('Aucun compte trouvé avec cet email.');
+      if (msg.includes('invalid_pin')) throw new Error('PIN incorrect.');
+      throw error;
+    }
+    const row = Array.isArray(data) ? data[0] : data;
+    return (row || null) as Profile | null;
+  }
+
+  /** Set or change the signed-in user's own PIN. */
+  public async setMyPin(pin: string): Promise<boolean> {
+    if (!this.isConfigured()) return false;
+    const { error } = await supabase.rpc('set_my_pin', { p_pin: pin } as never);
+    if (error) console.error('[supabase] setMyPin:', error.message);
+    return !error;
+  }
+
+  /** Super-admin sets/resets any user's PIN. */
+  public async adminSetPin(userId: string, pin: string): Promise<boolean> {
+    if (!this.isConfigured()) return false;
+    const { error } = await supabase.rpc('admin_set_pin', { p_user_id: userId, p_pin: pin } as never);
+    if (error) console.error('[supabase] adminSetPin:', error.message);
+    return !error;
+  }
+
   // --- auth activity log --------------------------------------------------
 
   /** Record a login/logout event for a user (fire-and-forget). */
