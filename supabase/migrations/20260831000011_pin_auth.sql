@@ -27,23 +27,33 @@ returns table (
 language plpgsql
 security definer set search_path = public
 as $$
-declare
-  v_row public.profiles%rowtype;
 begin
-  select * into v_row
-  from public.profiles
-  where lower(email) = lower(p_email)
-  limit 1;
-
-  if not found then
+  if not exists (
+    select 1 from public.profiles
+    where lower(email) = lower(p_email)
+  ) then
     raise exception 'ACCOUNT_NOT_FOUND';
   end if;
-  if v_row.pin is null or v_row.pin <> p_pin then
+
+  if not exists (
+    select 1 from public.profiles
+    where lower(email) = lower(p_email)
+    and pin is not null
+    and pin = p_pin
+  ) then
     raise exception 'INVALID_PIN';
   end if;
 
   return query
-    select v_row.id, v_row.email, v_row.name, v_row.role, v_row.farm_id, v_row.is_superadmin;
+    select
+      p.id,
+      p.email,
+      p.name,
+      p.role,
+      p.farm_id,
+      p.is_superadmin
+    from public.profiles p
+    where lower(p.email) = lower(p_email);
 end;
 $$;
 
