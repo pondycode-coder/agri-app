@@ -29,8 +29,13 @@ import {
   adminMoveUser,
 } from '@/lib/remoteSync';
 import { AdminFarm, AdminStats, AdminUser, AppRole, AuthEvent, formatFCFA } from '@/types/database';
-import { ShieldCheck, Building2, Users, LandPlot, ListChecks, Wallet, Trash2, RefreshCw, Ban, Check, LogIn, LogOut } from 'lucide-react';
+import { ShieldCheck, Building2, Users, LandPlot, ListChecks, Wallet, Trash2, RefreshCw, Ban, Check, LogIn, LogOut, Key } from 'lucide-react';
 import { isSupabaseConfigured } from '@/lib/supabase';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { PinInput } from '@/components/PinInput';
+import { hashPin } from '@/lib/pinAuth';
+import { dbStore } from '@/services/store';
 
 export default function SaasAdmin() {
   const { user } = useAuth();
@@ -41,6 +46,10 @@ export default function SaasAdmin() {
   const [farms, setFarms] = useState<AdminFarm[]>([]);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [events, setEvents] = useState<AuthEvent[]>([]);
+  const [pinDialogOpen, setPinDialogOpen] = useState(false);
+  const [pinTargetUser, setPinTargetUser] = useState<{ id: string; name: string } | null>(null);
+  const [newPin, setNewPin] = useState('');
+  const [pinSaving, setPinSaving] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -78,6 +87,25 @@ export default function SaasAdmin() {
 
   const handleDeleteFarm = (farmId: string) =>
     runAction(() => adminDeleteFarm(farmId), 'Ferme supprimée');
+
+  const openPinDialog = (userId: string, userName: string) => {
+    setPinTargetUser({ id: userId, name: userName });
+    setNewPin('');
+    setPinDialogOpen(true);
+  };
+
+  const handleSavePin = async () => {
+    if (!pinTargetUser || newPin.length !== 4) return;
+    setPinSaving(true);
+    try {
+      const hash = await hashPin(newPin);
+      dbStore.saveProfilePin(pinTargetUser.id, hash);
+      toast({ title: `PIN mis à jour pour ${pinTargetUser.name}` });
+      setPinDialogOpen(false);
+    } finally {
+      setPinSaving(false);
+    }
+  };
 
   if (!user?.is_superadmin) {
     return (
@@ -232,6 +260,7 @@ export default function SaasAdmin() {
                       <TableHead>Rôle</TableHead>
                       <TableHead>Exploitation</TableHead>
                       <TableHead>Super-admin</TableHead>
+                      <TableHead>PIN</TableHead>
                       <TableHead>Inscrit le</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -287,12 +316,24 @@ export default function SaasAdmin() {
                             {u.is_superadmin ? 'Super-admin' : 'Promouvoir'}
                           </Button>
                         </TableCell>
+                        <TableCell>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 text-xs"
+                            onClick={() => openPinDialog(u.id, u.name || u.email)}
+                            disabled={busy}
+                          >
+                            <Key className="h-3.5 w-3.5 mr-1" />
+                            Définir PIN
+                          </Button>
+                        </TableCell>
                         <TableCell>{new Date(u.created_at).toLocaleDateString('fr-FR')}</TableCell>
                       </TableRow>
                     ))}
                     {users.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={6} className="text-center text-slate-400 py-6">
+                        <TableCell colSpan={7} className="text-center text-slate-400 py-6">
                           Aucun compte.
                         </TableCell>
                       </TableRow>
@@ -352,6 +393,30 @@ export default function SaasAdmin() {
             </Card>
           </TabsContent>
         </Tabs>
+
+        <Dialog open={pinDialogOpen} onOpenChange={setPinDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Définir le PIN de {pinTargetUser?.name}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3 py-2">
+              <Label className="text-sm text-slate-500">Nouveau code PIN (4 chiffres)</Label>
+              <PinInput value={newPin} onChange={setNewPin} />
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setPinDialogOpen(false)} disabled={pinSaving}>
+                Annuler
+              </Button>
+              <Button
+                onClick={() => void handleSavePin()}
+                disabled={pinSaving || newPin.length !== 4}
+                className="bg-emerald-600 hover:bg-emerald-700"
+              >
+                {pinSaving ? 'Enregistrement...' : 'Enregistrer'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </MainLayout>
   );

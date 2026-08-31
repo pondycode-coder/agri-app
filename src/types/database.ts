@@ -19,6 +19,7 @@ export interface Profile {
   role: AppRole;
   farm_id?: string | null;
   is_superadmin?: boolean;
+  pin_hash?: string;
   created_at: string;
   updated_at: string;
 }

@@ -269,6 +269,18 @@ class LocalDatabaseStore {
     return this.profiles.find((p) => p.id === profileData.id)!;
   }
 
+  public saveProfilePin(profileId: string, pinHash: string): void {
+    const idx = this.profiles.findIndex((p) => p.id === profileId);
+    if (idx >= 0) {
+      this.profiles[idx] = { ...this.profiles[idx], pin_hash: pinHash, updated_at: new Date().toISOString() };
+      this.saveAll();
+    }
+  }
+
+  public getProfileByEmail(email: string): Profile | undefined {
+    return this.profiles.find((p) => p.email.toLowerCase() === email.toLowerCase());
+  }
+
   // --- PLOTS ---
   public getPlots(farmId?: string): Plot[] {
     if (farmId) return this.plots.filter((p) => p.farm_id === farmId);
