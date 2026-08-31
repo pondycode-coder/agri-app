@@ -13,51 +13,28 @@
 alter table public.profiles
   add column if not exists pin text;
 
--- Sign-in: verify email + PIN and return the profile row.
--- Returns no rows / raises when the account is unknown or the PIN is wrong.
-create or replace function public.sign_in_with_pin(p_email text, p_pin text)
-returns table (
-  id uuid,
-  email text,
-  name text,
-  role text,
-  farm_id uuid,
-  is_superadmin boolean
-)
-language plpgsql
+-- The PIN doubles as the Supabase account password so that sign-in creates a
+-- real session (auth.uid()) and RLS lets the app read the user's data. This
+-- function is no longer used by the app — sign-in is supabase.auth password
+-- auth with the PIN — but it is kept for reference. Drop it to keep things tidy.
+drop function if exists public.sign_in_with_pin(text, text);
+
+-- Return the complementary helper used by sign-in flows.
+create or replace function public.is_super_admin()
+returns boolean
+language sql
+stable
 security definer set search_path = public
 as $$
-begin
-  if not exists (
+  select exists (
     select 1 from public.profiles
-    where lower(email) = lower(p_email)
-  ) then
-    raise exception 'ACCOUNT_NOT_FOUND';
-  end if;
-
-  if not exists (
-    select 1 from public.profiles
-    where lower(email) = lower(p_email)
-    and pin is not null
-    and pin = p_pin
-  ) then
-    raise exception 'INVALID_PIN';
-  end if;
-
-  return query
-    select
-      p.id,
-      p.email,
-      p.name,
-      p.role,
-      p.farm_id,
-      p.is_superadmin
-    from public.profiles p
-    where lower(p.email) = lower(p_email);
-end;
+    where id = auth.uid() and is_superadmin = true
+  )
 $$;
 
 -- A user may set (or change) their own PIN at registration / from their profile.
+-- Keeps the Supabase account password in sync so the PIN remains valid for
+-- password-auth sign-in.
 create or replace function public.set_my_pin(p_pin text)
 returns void
 language plpgsql
@@ -70,10 +47,14 @@ begin
   update public.profiles
   set pin = p_pin, updated_at = now()
   where id = auth.uid();
+  update auth.users
+  set encrypted_password = crypt(p_pin, gen_salt('bf'))
+  where id = auth.uid();
 end;
 $$;
 
--- Super-admin can set/reset any user's PIN.
+-- Super-admin can set/reset any user's PIN. Also resets the Supabase password
+-- to the new PIN so the user can sign in with it.
 create or replace function public.admin_set_pin(p_user_id uuid, p_pin text)
 returns void
 language plpgsql
@@ -88,6 +69,9 @@ begin
   end if;
   update public.profiles
   set pin = p_pin, updated_at = now()
+  where id = p_user_id;
+  update auth.users
+  set encrypted_password = crypt(p_pin, gen_salt('bf'))
   where id = p_user_id;
 end;
 $$;
@@ -129,6 +113,5 @@ as $$
   order by p.created_at asc
 $$;
 
-grant execute on function public.sign_in_with_pin(text, text) to authenticated;
 grant execute on function public.set_my_pin(text) to authenticated;
 grant execute on function public.admin_set_pin(uuid, text) to authenticated;

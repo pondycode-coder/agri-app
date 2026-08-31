@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { dbStore } from '../services/store';
 import { Profile, Farm, AppRole } from '../types/database';
 import { hashPin, verifyPin } from '../lib/pinAuth';
-import { activateFarm, detachFarm, listUserFarms, switchFarm as switchFarmRemote, createFarmAndSwitch, joinFarmAndSwitch, signInWithPin, setMyPin } from '../lib/remoteSync';
+import { activateFarm, detachFarm, listUserFarms, switchFarm as switchFarmRemote, createFarmAndSwitch, joinFarmAndSwitch, setMyPin, getMyProfile, ensureMyProfile } from '../lib/remoteSync';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 interface AuthContextType {
@@ -82,8 +82,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setLoading(true);
     try {
       if (isSupabaseConfigured()) {
-        const profile = await signInWithPin(email, pin);
-        if (!profile) throw new Error('Connexion impossible.');
+        const { error } = await supabase.auth.signInWithPassword({ email, password: pin });
+        if (error) {
+          const msg = (error.message || '').toLowerCase();
+          if (msg.includes('invalid login') || msg.includes('invalid credentials')) {
+            throw new Error('Email ou PIN incorrect.');
+          }
+          if (msg.includes('confirm')) {
+            throw new Error('Votre email n\'a pas encore été confirmé.');
+          }
+          throw error;
+        }
+        let profile = await getMyProfile();
+        if (!profile) {
+          profile = await ensureMyProfile(email.split('@')[0], email);
+        }
+        if (!profile) throw new Error('Compte introuvable.');
         setUser(profile);
         if (profile.farm_id) {
           setActiveFarmId(profile.farm_id);
@@ -123,23 +137,36 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         throw new Error('Le PIN doit contenir exactement 4 chiffres.');
       }
       if (isSupabaseConfigured()) {
-        // Create the Supabase auth user (its trigger creates the DB profile
-        // row), then attach the PIN so the user can sign in with it.
-        const { error } = await supabase.auth.signUp({
+        // Create the Supabase auth user using the PIN as its password (its
+        // trigger creates the DB profile row). signUp also logs the user in,
+        // giving a real session so RLS lets the app read their data.
+        const { error: su } = await supabase.auth.signUp({
           email,
-          password: '!agriapp-pin-' + Date.now(),
-          options: { data: { name, role } },
+          password: pin,
+          options: { data: { name: name || email.split('@')[0], role } },
         });
-        if (error) {
-          const code = error.code || '';
-          const msg = error.message.toLowerCase();
+        if (su) {
+          const code = su.code || '';
+          const msg = (su.message || '').toLowerCase();
           if (code === 'user_already_exists' || msg.includes('already') || msg.includes('exists')) {
             throw new Error('Un compte avec cet email existe déjà.');
           }
-          throw error;
+          throw su;
         }
-        const pinned = await setMyPin(pin);
-        if (!pinned) throw new Error('Impossible d\'enregistrer votre PIN.');
+        // Store the PIN in the profiles column so it is visible to the admin.
+        await setMyPin(pin);
+        let newProf = await getMyProfile();
+        if (!newProf) {
+          newProf = await ensureMyProfile(name || email.split('@')[0], email);
+        }
+        if (!newProf) throw new Error('Impossible de créer le compte.');
+        setUser(newProf);
+        if (newProf.farm_id) {
+          setActiveFarmId(newProf.farm_id);
+          await activateFarm(newProf);
+          const userFarms = await listUserFarms();
+          if (userFarms.length > 0) setFarms(userFarms);
+        }
       } else {
         const existing = dbStore.getProfileByEmail(email);
         if (existing) {
@@ -169,6 +196,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signOut = async () => {
     detachFarm();
+    if (isSupabaseConfigured()) {
+      await supabase.auth.signOut();
+    }
     setUser(null);
     setFarms([]);
     setActiveFarmId(null);
