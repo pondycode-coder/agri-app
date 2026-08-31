@@ -93,6 +93,10 @@ end;
 $$;
 
 -- Extend the super-admin user list to expose each user's PIN.
+-- DROP first: the original (from 20260809000005) has a different return type,
+-- and CREATE OR REPLACE cannot change the OUT-parameter row type.
+drop function if exists public.admin_list_users();
+
 create or replace function public.admin_list_users()
 returns table (
   id uuid,
