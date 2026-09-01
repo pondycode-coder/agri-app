@@ -26,7 +26,7 @@ const LoginPage: React.FC = () => {
 
   useEffect(() => {
     if (submitSuccess.current && user) {
-      navigate("/dashboard", { replace: true });
+      navigate(user.is_superadmin ? "/dashboard/saas-admin" : "/dashboard", { replace: true });
     }
   }, [user, navigate]);
 
