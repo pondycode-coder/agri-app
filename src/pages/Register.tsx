@@ -5,18 +5,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert } from "@/components/ui/alert";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import AuthShell from "@/components/AuthShell";
 import { PinInput } from "@/components/PinInput";
-import { Loader2, AlertTriangle, CheckCircle, Mail, User, Hash } from "lucide-react";
-import { AppRole } from "@/types/database";
+import { pinToEmail } from "@/lib/pinAuth";
+import { Loader2, AlertTriangle, CheckCircle, User, Hash } from "lucide-react";
 
 const RegisterPage: React.FC = () => {
-  const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [pin, setPin] = useState("");
   const [pinConfirm, setPinConfirm] = useState("");
-  const [role, setRole] = useState<AppRole>("admin");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -39,7 +36,7 @@ const RegisterPage: React.FC = () => {
 
     setLoading(true);
     try {
-      await signUp(email, pin, name, role);
+      await signUp(pinToEmail(pin), pin, name, "admin");
       setSuccess("Compte créé ! Redirection...");
       setTimeout(() => navigate("/dashboard", { replace: true }), 1500);
     } catch (err) {
@@ -93,38 +90,6 @@ const RegisterPage: React.FC = () => {
               autoComplete="name"
             />
           </div>
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="email" className="font-medium text-white/70">
-            Email
-          </Label>
-          <div className="relative">
-            <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
-            <Input
-              id="email"
-              type="email"
-              placeholder="votre@email.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              disabled={loading}
-              className="h-11 pl-10 border-white/10 bg-white/[0.05] text-white placeholder:text-white/25 focus-visible:ring-emerald-500/50"
-              autoComplete="email"
-            />
-          </div>
-        </div>
-        <div className="space-y-2">
-          <Label className="font-medium text-white/70">Rôle</Label>
-          <Select value={role} onValueChange={(v) => setRole(v as AppRole)}>
-            <SelectTrigger className="h-11 border-white/10 bg-white/[0.05] text-white">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="admin">Administrateur</SelectItem>
-              <SelectItem value="manager">Manager</SelectItem>
-              <SelectItem value="worker">Ouvrier</SelectItem>
-            </SelectContent>
-          </Select>
         </div>
         <div className="space-y-3">
           <Label className="font-medium text-white/70 flex items-center gap-2">

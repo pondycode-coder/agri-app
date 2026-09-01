@@ -25,3 +25,12 @@ export async function verifyPin(pin: string, storedHash: string): Promise<boolea
 export const PIN_SECRET_PREFIX = 'agri-app-pin-';
 export const pinToSecret = (pin: string): string => `${PIN_SECRET_PREFIX}${pin}`;
 
+/**
+ * Supabase identifies accounts by email, but the app is PIN-only. A stable
+ * internal email is derived from the PIN so the user only ever enters their
+ * 4-digit PIN. This also prevents two accounts choosing the same PIN (the
+ * second registration fails with "account already exists").
+ */
+export const pinToEmail = (pin: string): string => `${pin}@local.agri`;
+
+

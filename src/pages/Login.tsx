@@ -2,12 +2,12 @@ import { useRef, useEffect, useState, useCallback } from "react";
 import { useAuth } from "../context/AuthProvider";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert } from "@/components/ui/alert";
 import AuthShell from "@/components/AuthShell";
 import { PinInput } from "@/components/PinInput";
-import { Loader2, AlertTriangle, Mail, Hash } from "lucide-react";
+import { pinToEmail } from "@/lib/pinAuth";
+import { Loader2, AlertTriangle, Hash } from "lucide-react";
 
 const getGreeting = () => {
   const hour = new Date().getHours();
@@ -17,7 +17,6 @@ const getGreeting = () => {
 };
 
 const LoginPage: React.FC = () => {
-  const [email, setEmail] = useState("");
   const [pin, setPin] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -40,7 +39,7 @@ const LoginPage: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      await signIn(email, pin);
+      await signIn(pinToEmail(pin), pin);
       submitSuccess.current = true;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Une erreur est survenue");
@@ -48,7 +47,7 @@ const LoginPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [email, pin, signIn]);
+  }, [pin, signIn]);
 
   return (
     <AuthShell
@@ -80,25 +79,6 @@ const LoginPage: React.FC = () => {
         </Alert>
       )}
       <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="space-y-2">
-          <Label htmlFor="email" className="font-medium text-white/70">
-            Email
-          </Label>
-          <div className="relative">
-            <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
-            <Input
-              id="email"
-              type="email"
-              placeholder="votre@email.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              disabled={loading}
-              className="h-11 pl-10 border-white/10 bg-white/[0.05] text-white placeholder:text-white/25 focus-visible:ring-emerald-500/50"
-              autoComplete="email"
-            />
-          </div>
-        </div>
         <div className="space-y-3">
           <Label className="font-medium text-white/70 flex items-center gap-2">
             <Hash className="h-4 w-4" />
