@@ -78,6 +78,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [user?.farm_id]);
 
+  // Activate the tenant + load the farm list after a successful login, but
+  // never let a data-loading failure block the redirect — the user is already
+  // authenticated at this point.
+  const secureActivate = async (profile: Profile) => {
+    if (!profile.farm_id) return;
+    setActiveFarmId(profile.farm_id);
+    try {
+      await activateFarm(profile);
+    } catch (err) {
+      console.error('[auth] activateFarm failed:', err);
+    }
+    try {
+      const userFarms = await listUserFarms();
+      if (userFarms.length > 0) setFarms(userFarms);
+    } catch (err) {
+      console.error('[auth] listUserFarms failed:', err);
+    }
+  };
+
   const signIn = async (email: string, pin: string) => {
     setLoading(true);
     try {
@@ -99,12 +118,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
         if (!profile) throw new Error('Compte introuvable.');
         setUser(profile);
-        if (profile.farm_id) {
-          setActiveFarmId(profile.farm_id);
-          await activateFarm(profile);
-          const userFarms = await listUserFarms();
-          if (userFarms.length > 0) setFarms(userFarms);
-        }
+        await secureActivate(profile);
       } else {
         const profile = dbStore.getProfileByEmail(email);
         if (!profile) {
@@ -118,12 +132,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           throw new Error('PIN incorrect.');
         }
         setUser(profile);
-        if (profile.farm_id) {
-          setActiveFarmId(profile.farm_id);
-          await activateFarm(profile);
-          const userFarms = await listUserFarms();
-          if (userFarms.length > 0) setFarms(userFarms);
-        }
+        await secureActivate(profile);
       }
     } finally {
       setLoading(false);
