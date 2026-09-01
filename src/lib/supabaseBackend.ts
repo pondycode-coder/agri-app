@@ -1,4 +1,4 @@
-import { Farm, Profile, Plot, AdminFarm, AdminUser, AdminStats, AuthEvent } from '../types/database';
+import { Farm, Profile, AdminFarm, AdminUser, AdminStats, AuthEvent } from '../types/database';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 export type EntityKey =
@@ -199,29 +199,20 @@ export class SupabaseBackend {
     return farm as Farm | null;
   }
 
-  /** First-run: persist the seed farm + plots so a fresh tenant has baseline data. */
-  public async seedFarmIfEmpty(emitFarm: Farm, emitPlots: Plot[]): Promise<void> {
+  /** First-run: persist the seed farm so a fresh tenant has baseline data. */
+  public async seedFarmIfEmpty(farmId: string): Promise<void> {
     if (!this.isConfigured()) return;
     const existing = await this.fetchAll<Farm>('farms');
     if (existing.length > 0) return;
-    await supabase.from('farms').upsert({
-      id: emitFarm.id,
-      name: emitFarm.name,
-      location: emitFarm.location,
-      plots: emitFarm.plots,
-      size_in_hectares: emitFarm.size_in_hectares,
-      description: emitFarm.description,
+    const { error } = await supabase.from('farms').upsert({
+      id: farmId,
+      name: 'Ma ferme',
+      location: '',
+      plots: 0,
+      size_in_hectares: 0,
+      description: '',
     } as never);
-    for (const p of emitPlots) {
-      await supabase.from('plots').upsert({
-        id: p.id,
-        farm_id: emitFarm.id,
-        name: p.name,
-        size_in_hectares: p.size_in_hectares,
-        soil_type: p.soil_type,
-        status: p.status,
-      } as never);
-    }
+    if (error) console.error('[supabase] seedFarmIfEmpty:', error.message);
   }
 
   // --- SaaS super-admin (platform-wide, gated server-side) ----------

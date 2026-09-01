@@ -1,13 +1,15 @@
 import { SupabaseBackend } from './supabaseBackend';
 import { dbStore } from '../services/store';
 import { Profile, Farm, AdminFarm, AdminUser, AdminStats, AppRole, AuthEvent } from '../types/database';
-import {
-  INITIAL_FARMS,
-  INITIAL_PLOTS,
-} from '../services/mockData';
 
 let activeBackend: SupabaseBackend | null = null;
 let activeUser: Profile | null = null;
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** The tenant farm created by the SQL seed migration (NOT the demo 'farm-1'). */
+export const SEED_FARM_UUID = '00000000-0000-4000-8000-000000000001';
 
 /**
  * Activate the Supabase tenant for a signed-in user.
@@ -21,13 +23,19 @@ let activeUser: Profile | null = null;
 export async function activateFarm(profile: Profile): Promise<void> {
   if (!profile.farm_id) return;
 
+  // In Supabase mode the farm id MUST be a real UUID. The demo tenant uses the
+  // string 'farm-1' which is invalid for UUID columns/RLS, so map it (and any
+  // other malformed id) to the seed farm created by the SQL migration.
+  if (profile.farm_id && !UUID_RE.test(profile.farm_id)) {
+    profile.farm_id = SEED_FARM_UUID;
+  }
+
   const backend = new SupabaseBackend(profile.farm_id);
   activeBackend = backend;
   activeUser = profile;
 
   if (backend.isConfigured()) {
-    const firstFarm = INITIAL_FARMS[0];
-    await backend.seedFarmIfEmpty(firstFarm, INITIAL_PLOTS.filter((p) => p.farm_id === firstFarm.id));
+    await backend.seedFarmIfEmpty(profile.farm_id);
     await backend.ensureMembership(profile.id, profile.farm_id);
     await backend.bindProfileToFarm(profile);
   }
