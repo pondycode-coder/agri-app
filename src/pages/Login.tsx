@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState, useCallback } from "react";
+import { useState } from "react";
 import { useAuth } from "../context/AuthProvider";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -20,17 +20,10 @@ const LoginPage: React.FC = () => {
   const [pin, setPin] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { signIn, user, loginAsDemo } = useAuth();
+  const { signIn, loginAsDemo } = useAuth();
   const navigate = useNavigate();
-  const submitSuccess = useRef(false);
 
-  useEffect(() => {
-    if (submitSuccess.current && user) {
-      navigate(user.is_superadmin ? "/dashboard/saas-admin" : "/dashboard", { replace: true });
-    }
-  }, [user, navigate]);
-
-  const handleSubmit = useCallback(async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (pin.length !== 4) {
       setError("Le PIN doit contenir 4 chiffres.");
@@ -39,15 +32,14 @@ const LoginPage: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      await signIn(pinToEmail(pin), pin);
-      submitSuccess.current = true;
+      const profile = await signIn(pinToEmail(pin), pin);
+      navigate(profile?.is_superadmin ? "/dashboard/saas-admin" : "/dashboard", { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Une erreur est survenue");
-      submitSuccess.current = false;
     } finally {
       setLoading(false);
     }
-  }, [pin, signIn]);
+  };
 
   return (
     <AuthShell

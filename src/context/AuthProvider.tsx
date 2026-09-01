@@ -11,7 +11,7 @@ interface AuthContextType {
   farms: Farm[];
   activeFarmId: string | null;
   isSuperAdmin: boolean;
-  signIn: (email: string, pin: string) => Promise<void>;
+  signIn: (email: string, pin: string) => Promise<Profile | null>;
   signUp: (email: string, pin: string, name: string, role?: AppRole) => Promise<void>;
   signOut: () => Promise<void>;
   switchRole: (role: AppRole) => void;
@@ -119,6 +119,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (!profile) throw new Error('Compte introuvable.');
         setUser(profile);
         await secureActivate(profile);
+        return profile;
       } else {
         const profile = dbStore.getProfileByEmail(email);
         if (!profile) {
@@ -133,6 +134,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
         setUser(profile);
         await secureActivate(profile);
+        return profile;
       }
     } finally {
       setLoading(false);
