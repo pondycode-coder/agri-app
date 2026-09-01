@@ -307,8 +307,11 @@ export class SupabaseBackend {
   public async adminSetPin(userId: string, pin: string): Promise<boolean> {
     if (!this.isConfigured()) return false;
     const { error } = await supabase.rpc('admin_set_pin', { p_user_id: userId, p_pin: pin } as never);
-    if (error) console.error('[supabase] adminSetPin:', error.message);
-    return !error;
+    if (error) {
+      console.error('[supabase] adminSetPin:', error.message);
+      throw new Error(error.message);
+    }
+    return true;
   }
 
   // --- auth activity log --------------------------------------------------

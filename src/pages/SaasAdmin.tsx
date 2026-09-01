@@ -102,9 +102,9 @@ export default function SaasAdmin() {
         toast({ title: `PIN mis à jour pour ${pinTargetUser.name}` });
         setPinDialogOpen(false);
         await load();
-      } else {
-        toast({ title: 'Action refusée', variant: 'destructive' });
       }
+    } catch (err) {
+      toast({ title: 'Impossible de mettre à jour le PIN', description: err instanceof Error ? err.message : undefined, variant: 'destructive' });
     } finally {
       setPinSaving(false);
     }
