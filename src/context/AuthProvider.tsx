@@ -140,7 +140,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         // Create the Supabase auth user using the PIN as its password (its
         // trigger creates the DB profile row). signUp also logs the user in,
         // giving a real session so RLS lets the app read their data.
-        const { error: su } = await supabase.auth.signUp({
+        const { data: suData, error: su } = await supabase.auth.signUp({
           email,
           password: pinToSecret(pin),
           options: { data: { name: name || email.split('@')[0], role } },
@@ -152,6 +152,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             throw new Error('Un compte avec cet email existe déjà.');
           }
           throw su;
+        }
+        // signUp does not always create a session (email confirmation may be
+        // enabled). Establish one so auth.uid() is set and the app can read the
+        // user's data through RLS.
+        if (!suData?.session) {
+          const { error: si } = await supabase.auth.signInWithPassword({ email, password: pinToSecret(pin) });
+          if (si) {
+            const sm = (si.message || '').toLowerCase();
+            if (sm.includes('confirm') || sm.includes('not confirmed')) {
+              throw new Error('Veuillez d\'abord confirmer votre email, puis réessayer.');
+            }
+            throw si;
+          }
         }
         // Store the PIN in the profiles column so it is visible to the admin.
         await setMyPin(pin);
