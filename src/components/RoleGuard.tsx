@@ -20,8 +20,8 @@ export const RoleGuard: React.FC<RoleGuardProps> = ({
   action = 'view',
   fallback,
 }) => {
-  const { user, switchRole } = useAuth();
-  const allowed = hasPermission(user?.role, action, resource);
+  const { effectiveRole } = useAuth();
+  const allowed = hasPermission(effectiveRole, action, resource);
 
   if (allowed) {
     return <>{children}</>;
@@ -42,30 +42,10 @@ export const RoleGuard: React.FC<RoleGuardProps> = ({
             Accès Restreint par Rôle
           </CardTitle>
           <CardDescription>
-            Votre rôle actuel (<Badge className="capitalize font-mono">{user?.role || 'Guest'}</Badge>) n'a pas les autorisations nécessaires pour accéder à ce module ({resource}).
+            Votre rôle actuel (<Badge className="capitalize font-mono">{effectiveRole || 'Guest'}</Badge>) n'a pas les autorisations nécessaires pour accéder à ce module ({resource}). Contactez un administrateur si vous pensez que c'est une erreur.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 pt-2 text-center">
-          <p className="text-xs text-slate-600">
-            Pour la démonstration, vous pouvez passer sur un rôle Administrateur ou Manager ci-dessous :
-          </p>
-          <div className="flex justify-center gap-2">
-            <Button
-              size="sm"
-              className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs"
-              onClick={() => switchRole('admin')}
-            >
-              👑 Passer Administrateur
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              className="border-amber-600 text-amber-700 hover:bg-amber-100 text-xs"
-              onClick={() => switchRole('manager')}
-            >
-              📊 Passer Manager
-            </Button>
-          </div>
           <div className="pt-2">
             <Button variant="ghost" size="sm" asChild>
               <Link to="/dashboard">

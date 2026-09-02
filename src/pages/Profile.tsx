@@ -37,7 +37,7 @@ const MIGRATION_SQL = [
 
 export default function Profile() {
   const { t } = useI18n();
-  const { user, switchRole } = useAuth();
+  const { user, switchRole, effectiveRole } = useAuth();
   const { toast } = useToast();
   const [, setTick] = useState(0);
   const [sqlCopied, setSqlCopied] = useState(false);
@@ -55,6 +55,8 @@ export default function Profile() {
     toast({ title: t('profile.sqlCopied') });
     setTimeout(() => setSqlCopied(false), 2000);
   };
+
+  const currentRole = effectiveRole || user?.role || 'admin';
 
   const roleLabels: Record<string, { label: string; color: string }> = {
     admin: { label: 'Administrateur', color: 'bg-emerald-100 text-emerald-800' },
@@ -94,34 +96,37 @@ export default function Profile() {
               </div>
               <div className="pt-2 border-t">
                 <p className="text-xs text-slate-500 uppercase mb-2">{t('profile.activeRole')}</p>
-                <Badge className={roleLabels[user?.role || 'admin']?.color || ''}>
-                  {roleLabels[user?.role || 'admin']?.label || user?.role}
+                <Badge className={roleLabels[currentRole]?.color || ''}>
+                  {roleLabels[currentRole]?.label || currentRole}
                 </Badge>
               </div>
             </CardContent>
           </Card>
 
-          {/* Role Switcher */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <ShieldCheck className="h-5 w-5 text-emerald-600" />
-                {t('profile.rolePermissions')}
-              </CardTitle>
-              <CardDescription>{t('profile.switchRoleToTest')}</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Button variant="outline" className="w-full justify-start" onClick={() => switchRole('admin')}>
-                <ShieldCheck className="h-4 w-4 mr-2" /> Administrateur — Accès complet
-              </Button>
-              <Button variant="outline" className="w-full justify-start" onClick={() => switchRole('manager')}>
-                <Database className="h-4 w-4 mr-2" /> Manager Ferme — Gestion opérationnelle
-              </Button>
-              <Button variant="outline" className="w-full justify-start" onClick={() => switchRole('worker')}>
-                <UserCircle className="h-4 w-4 mr-2" /> Ouvrier — Consultation limitée
-              </Button>
-            </CardContent>
-          </Card>
+          {/* Role Switcher — demo/local mode only. On Supabase the role is
+              server-side (profiles + user_farms) and cannot be switched here. */}
+          {!isSupabaseConfigured && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <ShieldCheck className="h-5 w-5 text-emerald-600" />
+                  {t('profile.rolePermissions')}
+                </CardTitle>
+                <CardDescription>{t('profile.switchRoleToTest')}</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Button variant="outline" className="w-full justify-start" onClick={() => switchRole('admin')}>
+                  <ShieldCheck className="h-4 w-4 mr-2" /> Administrateur — Accès complet
+                </Button>
+                <Button variant="outline" className="w-full justify-start" onClick={() => switchRole('manager')}>
+                  <Database className="h-4 w-4 mr-2" /> Manager Ferme — Gestion opérationnelle
+                </Button>
+                <Button variant="outline" className="w-full justify-start" onClick={() => switchRole('worker')}>
+                  <UserCircle className="h-4 w-4 mr-2" /> Ouvrier — Consultation limitée
+                </Button>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Supabase Config */}
           <Card className="md:col-span-2">

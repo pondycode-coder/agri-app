@@ -153,6 +153,9 @@ as $$
 $$;
 
 -- Change a user's role.
+-- Applies to the profile AND to the user's memberships (user_farms), so the
+-- role is consistent everywhere the app reads it (profiles.role fallback and
+-- per-farm user_farms.role).
 create or replace function public.admin_set_role(
   p_user_id uuid,
   p_role text
@@ -171,6 +174,9 @@ begin
   update public.profiles
   set role = p_role, updated_at = now()
   where id = p_user_id;
+  update public.user_farms
+  set role = p_role, updated_at = now()
+  where user_id = p_user_id;
 end;
 $$;
 

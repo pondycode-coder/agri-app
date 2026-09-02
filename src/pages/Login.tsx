@@ -7,6 +7,7 @@ import { Alert } from "@/components/ui/alert";
 import AuthShell from "@/components/AuthShell";
 import { PinInput } from "@/components/PinInput";
 import { pinToEmail } from "@/lib/pinAuth";
+import { isSupabaseConfigured } from "@/lib/supabase";
 import { Loader2, AlertTriangle, Hash } from "lucide-react";
 
 const getGreeting = () => {
@@ -47,14 +48,16 @@ const LoginPage: React.FC = () => {
       subtitle="Connectez-vous avec votre PIN"
       footer={
         <>
-          <Button
-            type="button"
-            variant="ghost"
-            className="w-full text-white/50 hover:text-white/80 hover:bg-white/[0.04]"
-            onClick={() => { loginAsDemo('admin'); navigate('/dashboard', { replace: true }); }}
-          >
-            Continuer en mode démo
-          </Button>
+          {!isSupabaseConfigured() && (
+            <Button
+              type="button"
+              variant="ghost"
+              className="w-full text-white/50 hover:text-white/80 hover:bg-white/[0.04]"
+              onClick={() => { loginAsDemo('admin'); navigate('/dashboard', { replace: true }); }}
+            >
+              Continuer en mode démo
+            </Button>
+          )}
           <div className="text-center text-sm text-white/40 pt-2">
             Pas encore de compte ?{" "}
             <a href="/register" className="font-medium text-emerald-400 hover:text-emerald-300 transition-colors">

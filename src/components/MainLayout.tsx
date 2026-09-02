@@ -46,7 +46,7 @@ import { AppRole } from '@/types/database';
 
 export const MainLayout = ({ children }: { children: React.ReactNode }) => {
   const { t, locale, setLocale } = useI18n();
-  const { user, isSuperAdmin, signOut, switchRole, farms, activeFarmId, switchFarm, createFarm, joinFarm } = useAuth();
+  const { user, isSuperAdmin, signOut, effectiveRole, farms, activeFarmId, switchFarm, createFarm, joinFarm } = useAuth();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
@@ -87,6 +87,8 @@ export const MainLayout = ({ children }: { children: React.ReactNode }) => {
         return <Badge variant="outline">Guest</Badge>;
     }
   };
+
+  const currentRole = effectiveRole || user?.role;
 
   const handleCreateFarm = async () => {
     if (!createForm.name.trim()) {
@@ -191,7 +193,7 @@ export const MainLayout = ({ children }: { children: React.ReactNode }) => {
               .filter((item) =>
                 item.resource === 'dashboard' || item.resource === 'saas-admin'
                   ? isSuperAdmin || item.resource === 'dashboard'
-                  : hasPermission(user?.role, 'view', item.resource as Resource)
+                  : hasPermission(currentRole, 'view', item.resource as Resource)
               )
               .map((item) => {
                 const Icon = item.icon;
@@ -270,10 +272,10 @@ export const MainLayout = ({ children }: { children: React.ReactNode }) => {
               <span className="text-xs text-slate-400">Rôle:</span>
             </div>
             <div className="flex items-center space-x-1.5">
-              {user?.is_superadmin && (
+              {isSuperAdmin && (
                 <Badge className="bg-amber-500 text-white hover:bg-amber-600">Super Admin</Badge>
               )}
-              {getRoleBadge(user?.role)}
+              {getRoleBadge(currentRole)}
             </div>
           </div>
 
@@ -293,26 +295,6 @@ export const MainLayout = ({ children }: { children: React.ReactNode }) => {
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setLocale('en')} className="cursor-pointer hover:bg-slate-800">
                   🇬🇧 English (EN)
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            {/* Role Switcher */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="text-xs border-slate-700 bg-slate-800/80 text-slate-200 hover:bg-slate-700 h-8">
-                  Switch Rôle
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="bg-slate-900 text-slate-100 border-slate-800">
-                <DropdownMenuItem onClick={() => switchRole('admin')} className="cursor-pointer hover:bg-slate-800">
-                  👑 Administrateur
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => switchRole('manager')} className="cursor-pointer hover:bg-slate-800">
-                  📊 Manager Ferme
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => switchRole('worker')} className="cursor-pointer hover:bg-slate-800">
-                  🌾 Ouvrier Agricole
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

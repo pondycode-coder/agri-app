@@ -20,53 +20,73 @@ export type Resource =
   | 'profile'
   | 'dashboard';
 
+export const ALL_ACTIONS: PermissionAction[] = ['view', 'create', 'edit', 'delete', 'manage_system'];
+
+export const ALL_RESOURCES: Resource[] = [
+  'farms',
+  'plots',
+  'crops',
+  'inventory',
+  'workers',
+  'tasks',
+  'financials',
+  'contacts',
+  'investments',
+  'profile',
+  'dashboard',
+];
+
+/** Resource -> actions allowed for a role (admin is implicit: everything). */
+export type RoleMatrix = Partial<Record<Resource, readonly PermissionAction[]>>;
+
+/**
+ * Data-driven permission matrix. Entries are additive: a missing resource means
+ * no permission on it (except admin, which is unlocked on everything via
+ * hasPermission). Used by the app, and the future basis for a SaaS-Admin
+ * permissions editor.
+ */
+export const PERMISSIONS: Record<Exclude<AppRole, 'admin'>, RoleMatrix> = {
+  // Operational control: full CRUD on day-to-day resources, read-only on
+  // finance & investments, and no platform-level manage_system.
+  manager: {
+    farms: ['view', 'create', 'edit', 'delete'],
+    plots: ['view', 'create', 'edit', 'delete'],
+    crops: ['view', 'create', 'edit', 'delete'],
+    inventory: ['view', 'create', 'edit', 'delete'],
+    workers: ['view', 'create', 'edit', 'delete'],
+    tasks: ['view', 'create', 'edit', 'delete'],
+    contacts: ['view', 'create', 'edit', 'delete'],
+    financials: ['view'],
+    investments: ['view'],
+    profile: ['view', 'edit'],
+    dashboard: ['view'],
+  },
+  // Field worker: view operational state, and may update their own tasks.
+  worker: {
+    farms: ['view'],
+    plots: ['view'],
+    crops: ['view'],
+    inventory: ['view'],
+    tasks: ['view', 'edit'],
+    profile: ['view'],
+    dashboard: ['view'],
+  },
+};
+
 /**
  * Checks if a given user role has permission to perform an action on a resource.
  */
 export function hasPermission(
   role: AppRole | undefined,
   action: PermissionAction,
-  resource: Resource
+  resource: Resource,
 ): boolean {
   if (!role) return false;
 
-  // Admin has full control over everything
+  // Admin has full control over everything (including manage_system).
   if (role === 'admin') return true;
 
-  // Manager privileges
-  if (role === 'manager') {
-    if (resource === 'investments' || resource === 'financials') {
-      // Manager can view financials & investments, but cannot delete or manage high level system settings
-      return action === 'view';
-    }
-    if (resource === 'profile') {
-      return action === 'view' || action === 'edit';
-    }
-    // Managers can view, create, edit, and delete operational resources (farms, plots, crops, inventory, workers, tasks, contacts)
-    return true;
-  }
-
-  // Worker privileges
-  if (role === 'worker') {
-    if (resource === 'dashboard') {
-      return action === 'view';
-    }
-    if (resource === 'tasks') {
-      // Worker can view tasks, edit task progress/status, but cannot delete tasks
-      return action === 'view' || action === 'edit';
-    }
-    if (resource === 'crops' || resource === 'plots' || resource === 'inventory' || resource === 'farms') {
-      // Workers can view operational status
-      return action === 'view';
-    }
-    if (resource === 'profile') {
-      return action === 'view';
-    }
-    // Workers cannot access or alter financials, investments, workers management
-    return false;
-  }
-
-  return false;
+  return (PERMISSIONS[role]?.[resource]?.includes(action) ?? false);
 }
 
 export const canManageFarms = (role?: AppRole) => hasPermission(role, 'create', 'farms');

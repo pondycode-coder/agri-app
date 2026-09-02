@@ -1,6 +1,6 @@
 import { SupabaseBackend } from './supabaseBackend';
 import { dbStore } from '../services/store';
-import { Profile, Farm, AdminFarm, AdminUser, AdminStats, AppRole, AuthEvent } from '../types/database';
+import { Profile, Farm, AdminFarm, AdminUser, AdminStats, AppRole, AuthEvent, UserFarmMembership } from '../types/database';
 
 let activeBackend: SupabaseBackend | null = null;
 let activeUser: Profile | null = null;
@@ -46,7 +46,7 @@ export async function activateFarm(profile: Profile): Promise<void> {
   }
 }
 
-export async function listUserFarms(): Promise<Farm[]> {
+export async function listUserFarms(): Promise<UserFarmMembership[]> {
   if (!activeBackend?.isConfigured()) return [];
   return activeBackend.listMyFarms();
 }

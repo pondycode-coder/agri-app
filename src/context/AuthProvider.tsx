@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { dbStore } from '../services/store';
-import { Profile, Farm, AppRole } from '../types/database';
+import { Profile, Farm, AppRole, UserFarmMembership } from '../types/database';
 import { hashPin, verifyPin, pinToSecret } from '../lib/pinAuth';
 import { activateFarm, detachFarm, listUserFarms, switchFarm as switchFarmRemote, createFarmAndSwitch, joinFarmAndSwitch, setMyPin, getMyProfile, ensureMyProfile } from '../lib/remoteSync';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
@@ -12,6 +12,12 @@ interface AuthContextType {
   farms: Farm[];
   activeFarmId: string | null;
   isSuperAdmin: boolean;
+  /**
+   * Role granted on the ACTIVE farm (from user_farms), falling back to the
+   * profile's role when the membership is not loaded yet. Permissions must
+   * always be checked against this, not `user.role`.
+   */
+  effectiveRole: AppRole | undefined;
   signIn: (email: string, pin: string) => Promise<Profile | null>;
   signUp: (email: string, pin: string, name: string, role?: AppRole) => Promise<void>;
   signOut: () => Promise<void>;
@@ -74,6 +80,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState<boolean>(false);
   const [farms, setFarms] = useState<Farm[]>([]);
   const [activeFarmId, setActiveFarmId] = useState<string | null>(null);
+  // Per-farm role map: farmId -> role granted in user_farms. This is the
+  // source of truth for authorization while a farm is active.
+  const [farmRoles, setFarmRoles] = useState<Record<string, AppRole>>({});
+
+  const applyFarms = (memberships: UserFarmMembership[]) => {
+    setFarms(memberships.map((m) => m.farm));
+    setFarmRoles(Object.fromEntries(memberships.map((m) => [m.farm.id, m.role])));
+  };
+
+  const effectiveRole: AppRole | undefined =
+    (activeFarmId && farmRoles[activeFarmId]) || user?.role || undefined;
 
   // Restore a real Supabase session on refresh so protected pages (and the
   // post-login redirect) work after a page reload.
@@ -95,8 +112,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setUser(p);
           if (p.farm_id) {
             setActiveFarmId(p.farm_id);
-            void activateFarm(p);
-            void listUserFarms().then((f) => { if (f.length > 0) setFarms(f); });
+void activateFarm(p);
+          void listUserFarms().then((m) => { if (m.length > 0) applyFarms(m); });
           }
         }
       }
@@ -122,7 +139,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
     setActiveFarmId(user.farm_id);
     void activateFarm(user);
-    void listUserFarms().then((f) => { if (f.length > 0) setFarms(f); });
+    void listUserFarms().then((m) => { if (m.length > 0) applyFarms(m); });
   }, [user?.farm_id]);
 
   // Activate the tenant + load the farm list after a successful login, but
@@ -137,8 +154,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.error('[auth] activateFarm failed:', err);
     }
     try {
-      const userFarms = await listUserFarms();
-      if (userFarms.length > 0) setFarms(userFarms);
+      const memberships = await listUserFarms();
+      if (memberships.length > 0) applyFarms(memberships);
     } catch (err) {
       console.error('[auth] listUserFarms failed:', err);
     }
@@ -235,8 +252,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (newProf.farm_id) {
           setActiveFarmId(newProf.farm_id);
           await activateFarm(newProf);
-          const userFarms = await listUserFarms();
-          if (userFarms.length > 0) setFarms(userFarms);
+          const memberships = await listUserFarms();
+          if (memberships.length > 0) applyFarms(memberships);
         }
       } else {
         const existing = dbStore.getProfileByEmail(email);
@@ -256,8 +273,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (newProf.farm_id) {
           setActiveFarmId(newProf.farm_id);
           await activateFarm(newProf);
-          const userFarms = await listUserFarms();
-          if (userFarms.length > 0) setFarms(userFarms);
+          const memberships = await listUserFarms();
+          if (memberships.length > 0) applyFarms(memberships);
         }
       }
     } finally {
@@ -272,19 +289,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
     setUser(null);
     setFarms([]);
+    setFarmRoles({});
     setActiveFarmId(null);
   };
 
   const switchRole = (newRole: AppRole) => {
     if (!user) return;
+    // Local/demo mode only. In Supabase mode the role lives in the DB
+    // (profiles + user_farms); client-side switching would only fake the UI
+    // and fight the server — so it is a strict no-op there.
+    if (isSupabaseConfigured()) return;
     const updated = { ...user, role: newRole };
     setUser(updated);
     dbStore.saveProfile(updated);
   };
 
   const refreshFarms = async () => {
-    const userFarms = await listUserFarms();
-    if (userFarms.length > 0) setFarms(userFarms);
+    const memberships = await listUserFarms();
+    if (memberships.length > 0) applyFarms(memberships);
   };
 
   const switchFarm = async (farmId: string) => {
@@ -314,6 +336,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const loginAsDemo = (role: AppRole) => {
+    // Never available on a deployed/configured Supabase instance.
+    if (isSupabaseConfigured()) return;
     const profiles = dbStore.getProfiles();
     let demoUser = profiles.find((p) => p.role === role) || profiles[0];
     if (!demoUser) {
@@ -340,6 +364,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         farms,
         activeFarmId,
         isSuperAdmin: user?.is_superadmin === true,
+        effectiveRole,
         signIn,
         signUp,
         signOut,

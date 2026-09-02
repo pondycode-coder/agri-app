@@ -11,6 +11,12 @@ export interface Farm {
   updated_at: string;
 }
 
+/** A user's membership of a farm, carrying the per-farm role. */
+export interface UserFarmMembership {
+  farm: Farm;
+  role: AppRole;
+}
+
 export interface Profile {
   id: string;
   email: string;

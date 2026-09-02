@@ -1,4 +1,4 @@
-import { Farm, Profile, AdminFarm, AdminUser, AdminStats, AuthEvent } from '../types/database';
+import { Farm, Profile, AdminFarm, AdminUser, AdminStats, AuthEvent, AppRole, UserFarmMembership } from '../types/database';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 export type EntityKey =
@@ -148,21 +148,24 @@ export class SupabaseBackend {
     if (error) console.error('[supabase] ensureMembership:', error.message);
   }
 
-  /** List farms the current user belongs to (via user_farms). */
-  public async listMyFarms(): Promise<Farm[]> {
+  /** List farms the current user belongs to, with their per-farm role. */
+  public async listMyFarms(): Promise<UserFarmMembership[]> {
     if (!this.isConfigured()) return [];
     const { data, error } = await supabase
       .from('user_farms')
-      .select('farm_id, farms(*)');
+      .select('farm_id, role, farms(*)');
     if (error) {
       console.error('[supabase] listMyFarms:', error.message);
       return [];
     }
     return (data || [])
-      .map((row) => (row as { farms: Farm[] | null }).farms)
-      .filter((f): f is Farm[] => Array.isArray(f))
-      .map((f) => f[0])
-      .filter((f): f is Farm => Boolean(f));
+      .map((row) => {
+        const r = row as { farm_id: string; role: string; farms: Farm[] | null };
+        const farm = Array.isArray(r.farms) ? r.farms[0] : null;
+        if (!farm) return null;
+        return { farm, role: r.role as AppRole } satisfies UserFarmMembership;
+      })
+      .filter((x): x is UserFarmMembership => Boolean(x));
   }
 
   /** Create a farm owned by the current user and join it (single transaction). */
