@@ -19,6 +19,8 @@ import ensureProfileSql from '../../supabase/migrations/20260809000007_ensure_pr
 import ensureProfileIdempotentSql from '../../supabase/migrations/20260809000008_ensure_profile_idempotent.sql?raw';
 import taskAdvancesSql from '../../supabase/migrations/20260809000009_task_advances.sql?raw';
 import authEventsSql from '../../supabase/migrations/20260816000010_auth_events.sql?raw';
+import pinAuthSql from '../../supabase/migrations/20260831000011_pin_auth.sql?raw';
+import rlsRolePermissionsSql from '../../supabase/migrations/20260902000012_rls_role_permissions.sql?raw';
 
 // The full, current schema (every migration in order) so "Copy SQL" bootstraps
 // a complete database — including workers, farm_tasks, contacts, financials, etc.
@@ -33,6 +35,8 @@ const MIGRATION_SQL = [
   ensureProfileIdempotentSql,
   taskAdvancesSql,
   authEventsSql,
+  pinAuthSql,
+  rlsRolePermissionsSql,
 ].join('\n\n-- ------------------------------------------------------------------\n\n');
 
 export default function Profile() {
