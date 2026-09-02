@@ -10,6 +10,11 @@
 -- the user.
 -- ---------------------------------------------------------------------------
 
+-- crypt()/gen_salt() live in the pgcrypto extension. Supabase installs it in
+-- the `extensions` schema, which is NOT on the default search_path — so the
+-- functions below MUST include it explicitly.
+create extension if not exists pgcrypto with schema extensions;
+
 alter table public.profiles
   add column if not exists pin text;
 
@@ -39,7 +44,7 @@ $$;
 create or replace function public.set_my_pin(p_pin text)
 returns void
 language plpgsql
-security definer set search_path = public
+security definer set search_path = public, extensions
 as $$
 begin
   if p_pin is null or not (p_pin ~ '^\d{4}$') then
@@ -59,7 +64,7 @@ $$;
 create or replace function public.admin_set_pin(p_user_id uuid, p_pin text)
 returns void
 language plpgsql
-security definer set search_path = public
+security definer set search_path = public, extensions
 as $$
 begin
   if not public.is_super_admin() then
