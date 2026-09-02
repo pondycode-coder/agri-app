@@ -38,34 +38,40 @@ as $$
 $$;
 
 -- A user may set (or change) their own PIN at registration / from their profile.
--- Keeps the Supabase account password in sync so the PIN remains valid for
--- password-auth sign-in. Supabase needs >=6 char passwords, so the stored
--- password is derived from the 4-digit PIN (frontend uses the same prefix).
+-- Keeps the Supabase account password AND email in sync so the PIN remains
+-- valid for password-auth sign-in (the app derives email = <pin>@local.agri).
 create or replace function public.set_my_pin(p_pin text)
 returns void
 language plpgsql
 security definer set search_path = public, extensions
 as $$
+declare
+  v_email text;
 begin
   if p_pin is null or not (p_pin ~ '^\d{4}$') then
     raise exception 'INVALID_PIN_FORMAT';
   end if;
+  v_email := p_pin || '@local.agri';
   update public.profiles
-  set pin = p_pin, updated_at = now()
+  set pin = p_pin, email = v_email, updated_at = now()
   where id = auth.uid();
   update auth.users
-  set encrypted_password = crypt('agri-app-pin-' || p_pin, gen_salt('bf'))
+  set encrypted_password = crypt('agri-app-pin-' || p_pin, gen_salt('bf')),
+      updated_at = now()
   where id = auth.uid();
 end;
 $$;
 
 -- Super-admin can set/reset any user's PIN. Also resets the Supabase password
--- to the derived value so the user can sign in with the PIN.
+-- and re-keys the account email to the derived value so the user can sign in
+-- with just the PIN.
 create or replace function public.admin_set_pin(p_user_id uuid, p_pin text)
 returns void
 language plpgsql
 security definer set search_path = public, extensions
 as $$
+declare
+  v_email text;
 begin
   if not public.is_super_admin() then
     raise exception 'forbidden';
@@ -73,11 +79,24 @@ begin
   if p_pin is null or not (p_pin ~ '^\d{4}$') then
     raise exception 'INVALID_PIN_FORMAT';
   end if;
-  update public.profiles
-  set pin = p_pin, updated_at = now()
-  where id = p_user_id;
+  v_email := p_pin || '@local.agri';
+
+  -- Two users sharing the same PIN would clash on the derived email. Reject it.
+  if exists (
+    select 1 from auth.users
+    where email = v_email and id <> p_user_id
+  ) then
+    raise exception 'PIN_ALREADY_TAKEN';
+  end if;
+
   update auth.users
-  set encrypted_password = crypt('agri-app-pin-' || p_pin, gen_salt('bf'))
+  set email = v_email,
+      encrypted_password = crypt('agri-app-pin-' || p_pin, gen_salt('bf')),
+      updated_at = now()
+  where id = p_user_id;
+
+  update public.profiles
+  set email = v_email, pin = p_pin, updated_at = now()
   where id = p_user_id;
 end;
 $$;
