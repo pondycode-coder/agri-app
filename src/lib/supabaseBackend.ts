@@ -1,4 +1,4 @@
-import { Farm, Profile, AdminFarm, AdminUser, AdminStats, AuthEvent, AppRole, UserFarmMembership } from '../types/database';
+import { Farm, Profile, AdminFarm, AdminUser, AdminStats, AuthEvent, AppRole, UserFarmMembership, RolePermission } from '../types/database';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 export type EntityKey =
@@ -148,6 +148,14 @@ export class SupabaseBackend {
     if (error) console.error('[supabase] ensureMembership:', error.message);
   }
 
+  /** Switch the user's active farm in the DB so RLS + role lookups follow. */
+  public async setActiveFarm(farmId: string): Promise<boolean> {
+    if (!this.isConfigured()) return false;
+    const { error } = await supabase.rpc('set_active_farm', { p_farm_id: farmId } as never);
+    if (error) console.error('[supabase] setActiveFarm:', error.message);
+    return !error;
+  }
+
   /** List farms the current user belongs to, with their per-farm role. */
   public async listMyFarms(): Promise<UserFarmMembership[]> {
     if (!this.isConfigured()) return [];
@@ -263,6 +271,40 @@ export class SupabaseBackend {
     if (!this.isConfigured()) return false;
     const { error } = await supabase.rpc('admin_set_role', { p_user_id: userId, p_role: role } as never);
     if (error) console.error('[supabase] adminSetRole:', error.message);
+    return !error;
+  }
+
+  public async adminListPermissions(): Promise<RolePermission[]> {
+    if (!this.isConfigured()) return [];
+    const { data, error } = await supabase.rpc('admin_list_permissions' as never);
+    if (error) {
+      console.error('[supabase] adminListPermissions:', error.message);
+      return [];
+    }
+    return (data || []) as RolePermission[];
+  }
+
+  public async adminSetPermission(
+    role: AppRole,
+    resource: string,
+    action: string,
+    allowed: boolean,
+  ): Promise<boolean> {
+    if (!this.isConfigured()) return false;
+    const { error } = await supabase.rpc('admin_set_permission', {
+      p_role: role,
+      p_resource: resource,
+      p_action: action,
+      p_allowed: allowed,
+    } as never);
+    if (error) console.error('[supabase] adminSetPermission:', error.message);
+    return !error;
+  }
+
+  public async adminResetPermissions(): Promise<boolean> {
+    if (!this.isConfigured()) return false;
+    const { error } = await supabase.rpc('admin_reset_permissions' as never);
+    if (error) console.error('[supabase] adminResetPermissions:', error.message);
     return !error;
   }
 

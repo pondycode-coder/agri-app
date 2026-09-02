@@ -17,6 +17,13 @@ export interface UserFarmMembership {
   role: AppRole;
 }
 
+/** A single cell of the DB-side permission matrix (role_permissions). */
+export interface RolePermission {
+  role: AppRole;
+  resource: string;
+  action: string;
+}
+
 export interface Profile {
   id: string;
   email: string;

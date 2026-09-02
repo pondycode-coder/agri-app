@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { MainLayout } from '@/components/MainLayout';
 import { useAuth } from '@/context/AuthProvider';
 import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -28,6 +29,9 @@ import {
   adminDeleteFarm,
   adminMoveUser,
   adminSetPin,
+  adminListPermissions,
+  adminSetPermission,
+  adminResetPermissions,
 } from '@/lib/remoteSync';
 import { AdminFarm, AdminStats, AdminUser, AppRole, AuthEvent, formatFCFA } from '@/types/database';
 import { ShieldCheck, Building2, Users, LandPlot, ListChecks, Wallet, Trash2, RefreshCw, Ban, Check, LogIn, LogOut, Key, Edit3 } from 'lucide-react';
@@ -35,6 +39,40 @@ import { isSupabaseConfigured } from '@/lib/supabase';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { PinInput } from '@/components/PinInput';
+import { Checkbox } from '@/components/ui/checkbox';
+import { ALL_RESOURCES, PermissionAction } from '@/utils/rbac';
+
+type PermMap = Record<string, Record<string, Record<string, boolean>>>;
+
+const EDITABLE_ROLES: AppRole[] = ['manager', 'worker'];
+const EDITABLE_ACTIONS: PermissionAction[] = ['view', 'create', 'edit', 'delete'];
+
+const RESOURCE_LABELS: Record<string, string> = {
+  farms: 'Exploitations',
+  plots: 'Parcelles',
+  crops: 'Cultures',
+  inventory: 'Stock',
+  workers: 'Ouvriers',
+  tasks: 'Tâches',
+  financials: 'Finances',
+  contacts: 'Contacts',
+  investments: 'Investissements',
+  profile: 'Profil',
+  dashboard: 'Tableau de bord',
+};
+
+const ROLE_LABELS: Record<string, string> = { manager: 'Manager', worker: 'Ouvrier' };
+const ACTION_LABELS: Record<string, string> = { view: 'Voir', create: 'Créer', edit: 'Modifier', delete: 'Supprimer' };
+
+const buildEmptyPerms = (): PermMap =>
+  Object.fromEntries(
+    EDITABLE_ROLES.map((role) => [
+      role,
+      Object.fromEntries(
+        ALL_RESOURCES.map((res) => [res, Object.fromEntries(EDITABLE_ACTIONS.map((a) => [a, false]))]),
+      ),
+    ]),
+  );
 
 export default function SaasAdmin() {
   const { user } = useAuth();
@@ -49,6 +87,9 @@ export default function SaasAdmin() {
   const [pinTargetUser, setPinTargetUser] = useState<{ id: string; name: string } | null>(null);
   const [newPin, setNewPin] = useState('');
   const [pinSaving, setPinSaving] = useState(false);
+  const [perms, setPerms] = useState<PermMap>(buildEmptyPerms);
+  const [permsBase, setPermsBase] = useState<PermMap | null>(null);
+  const [permsDirty, setPermsDirty] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -57,7 +98,21 @@ export default function SaasAdmin() {
     setFarms(f);
     setUsers(u);
     setEvents(e);
+    void loadPerms();
     setLoading(false);
+  }, []);
+
+  const loadPerms = useCallback(async () => {
+    const rows = await adminListPermissions();
+    const map = buildEmptyPerms();
+    for (const row of rows) {
+      if (map[row.role]?.[row.resource]?.[row.action] !== undefined) {
+        map[row.role][row.resource][row.action] = true;
+      }
+    }
+    setPerms(map);
+    setPermsBase(map);
+    setPermsDirty(false);
   }, []);
 
   useEffect(() => {
@@ -107,6 +162,58 @@ export default function SaasAdmin() {
       toast({ title: 'Impossible de mettre à jour le PIN', description: err instanceof Error ? err.message : undefined, variant: 'destructive' });
     } finally {
       setPinSaving(false);
+    }
+  };
+
+  const togglePerm = (role: string, resource: string, action: string) => {
+    const next = JSON.parse(JSON.stringify(perms)) as PermMap;
+    const value = next[role]?.[resource]?.[action];
+    if (value === undefined) return;
+    next[role][resource][action] = !value;
+    setPerms(next);
+    setPermsDirty(true);
+  };
+
+  const savePerms = async () => {
+    if (!permsBase) return;
+    setBusy(true);
+    try {
+      const changes: Array<{ role: AppRole; resource: string; action: PermissionAction; allowed: boolean }> = [];
+      for (const role of EDITABLE_ROLES) {
+        for (const res of ALL_RESOURCES) {
+          for (const action of EDITABLE_ACTIONS) {
+            const now = perms[role]?.[res]?.[action] ?? false;
+            const base = permsBase[role]?.[res]?.[action] ?? false;
+            if (now !== base) changes.push({ role, resource: res, action, allowed: now });
+          }
+        }
+      }
+      if (changes.length === 0) {
+        toast({ title: 'Aucune modification à enregistrer.' });
+        return;
+      }
+      for (const c of changes) {
+        const ok = await adminSetPermission(c.role, c.resource, c.action, c.allowed);
+        if (!ok) {
+          toast({ title: 'Échec de la mise à jour des permissions', variant: 'destructive' });
+          return;
+        }
+      }
+      toast({ title: `${changes.length} autorisation(s) mise(s) à jour` });
+      await loadPerms();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const resetPerms = async () => {
+    setBusy(true);
+    try {
+      const ok = await adminResetPermissions();
+      toast(ok ? { title: 'Permissions rétablies aux valeurs par défaut' } : { title: 'Action refusée', variant: 'destructive' });
+      await loadPerms();
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -183,6 +290,7 @@ export default function SaasAdmin() {
             <TabsTrigger value="farms">Exploitations ({farms.length})</TabsTrigger>
             <TabsTrigger value="users">Comptes ({users.length})</TabsTrigger>
             <TabsTrigger value="activity">Activité ({events.length})</TabsTrigger>
+            <TabsTrigger value="permissions">Permissions</TabsTrigger>
           </TabsList>
 
           <TabsContent value="farms" className="space-y-4">
@@ -397,6 +505,76 @@ export default function SaasAdmin() {
                     )}
                   </TableBody>
                 </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        <TabsContent value="permissions" className="space-y-4">
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                  <div>
+                    <p className="text-sm font-semibold">Matrice des permissions</p>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Appliquée côté base de données (RLS) et côté application. Le rôle <b>Admin</b> garde toujours un accès complet (non modifiable).
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={() => void resetPerms()} disabled={busy}>
+                      Rétablir l'état par défaut
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="bg-emerald-600 hover:bg-emerald-700"
+                      onClick={() => void savePerms()}
+                      disabled={busy || !permsDirty}
+                    >
+                      {busy ? 'Enregistrement...' : 'Enregistrer'}
+                    </Button>
+                  </div>
+                </div>
+
+                {EDITABLE_ROLES.map((role) => (
+                  <div key={role} className="mb-8 last:mb-0">
+                    <Badge
+                      className={`mb-2 text-white ${
+                        role === 'manager' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-blue-600 hover:bg-blue-700'
+                      }`}
+                    >
+                      {ROLE_LABELS[role] || role}
+                    </Badge>
+                    <div className="rounded-lg border overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-48">Module</TableHead>
+                            {EDITABLE_ACTIONS.map((a) => (
+                              <TableHead key={a} className="text-center min-w-20">
+                                {ACTION_LABELS[a]}
+                              </TableHead>
+                            ))}
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {ALL_RESOURCES.map((res) => (
+                            <TableRow key={res}>
+                              <TableCell className="font-medium">{RESOURCE_LABELS[res] || res}</TableCell>
+                              {EDITABLE_ACTIONS.map((a) => (
+                                <TableCell key={a} className="text-center">
+                                  {perms[role]?.[res]?.[a] !== undefined && (
+                                    <Checkbox
+                                      checked={perms[role]?.[res]?.[a]}
+                                      onCheckedChange={() => togglePerm(role, res, a)}
+                                    />
+                                  )}
+                                </TableCell>
+                              ))}
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                ))}
               </CardContent>
             </Card>
           </TabsContent>

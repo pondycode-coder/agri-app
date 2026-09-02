@@ -1,6 +1,6 @@
 import { SupabaseBackend } from './supabaseBackend';
 import { dbStore } from '../services/store';
-import { Profile, Farm, AdminFarm, AdminUser, AdminStats, AppRole, AuthEvent, UserFarmMembership } from '../types/database';
+import { Profile, Farm, AdminFarm, AdminUser, AdminStats, AppRole, AuthEvent, UserFarmMembership, RolePermission } from '../types/database';
 
 let activeBackend: SupabaseBackend | null = null;
 let activeUser: Profile | null = null;
@@ -114,11 +114,15 @@ export async function switchFarm(farmId: string): Promise<void> {
   if (!activeBackend || !activeUser) return;
   activeBackend.farmId = farmId;
   if (activeBackend.isConfigured()) {
+    // Membership first (so set_active_farm accepts), then flip profiles.farm_id
+    // so RLS (current_farm_id) and per-farm role lookups follow the switch,
+    // then hydrate — the reads now run under the new farm's RLS scope.
+    await activeBackend.ensureMembership(activeUser.id, farmId);
+    await activeBackend.setActiveFarm(farmId);
     await dbStore.hydrateFromRemote(farmId);
   } else {
     dbStore.hydrateLocal(farmId);
   }
-  await activeBackend.ensureMembership(activeUser.id, farmId);
 }
 
 export function detachFarm(): void {
@@ -162,6 +166,26 @@ export async function adminSetRole(userId: string, role: AppRole): Promise<boole
 export async function adminSetSuperadmin(userId: string, active: boolean): Promise<boolean> {
   if (!activeBackend?.isConfigured()) return false;
   return activeBackend.adminSetSuperadmin(userId, active);
+}
+
+export async function adminListPermissions(): Promise<RolePermission[]> {
+  if (!activeBackend?.isConfigured()) return [];
+  return activeBackend.adminListPermissions();
+}
+
+export async function adminSetPermission(
+  role: AppRole,
+  resource: string,
+  action: string,
+  allowed: boolean,
+): Promise<boolean> {
+  if (!activeBackend?.isConfigured()) return false;
+  return activeBackend.adminSetPermission(role, resource, action, allowed);
+}
+
+export async function adminResetPermissions(): Promise<boolean> {
+  if (!activeBackend?.isConfigured()) return false;
+  return activeBackend.adminResetPermissions();
 }
 
 export async function adminDeleteFarm(farmId: string): Promise<boolean> {
