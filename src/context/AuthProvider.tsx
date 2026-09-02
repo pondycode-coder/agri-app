@@ -207,7 +207,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           const code = su.code || '';
           const msg = (su.message || '').toLowerCase();
           if (code === 'user_already_exists' || msg.includes('already') || msg.includes('exists')) {
-            throw new Error('Un compte avec cet email existe déjà.');
+            throw new Error('Ce PIN est déjà utilisé par un autre compte. Choisissez un autre code.');
           }
           throw su;
         }

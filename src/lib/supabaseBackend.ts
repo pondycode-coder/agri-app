@@ -300,7 +300,17 @@ export class SupabaseBackend {
     const { error } = await supabase.rpc('admin_set_pin', { p_user_id: userId, p_pin: pin } as never);
     if (error) {
       console.error('[supabase] adminSetPin:', error.message);
-      throw new Error(error.message);
+      const msg = (error.message || '').toUpperCase();
+      if (msg.includes('PIN_ALREADY_TAKEN')) {
+        throw new Error('Ce PIN est déjà utilisé par un autre compte. Choisissez un autre code.');
+      }
+      if (msg.includes('INVALID_PIN_FORMAT')) {
+        throw new Error('Le PIN doit contenir exactement 4 chiffres.');
+      }
+      if (msg.includes('FORBIDDEN')) {
+        throw new Error('Action refusée : vous n\'êtes pas super-admin.');
+      }
+      throw new Error(msg);
     }
     return true;
   }
