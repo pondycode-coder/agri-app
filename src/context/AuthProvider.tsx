@@ -8,6 +8,7 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 interface AuthContextType {
   user: Profile | null;
   loading: boolean;
+  ready: boolean;
   farms: Farm[];
   activeFarmId: string | null;
   isSuperAdmin: boolean;
@@ -33,6 +34,9 @@ export const useAuth = () => {
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<Profile | null>(() => {
+    // Only DEMO/local-mode profiles are allowed to boot from the cache.
+    // On Supabase the user must come from a real auth session — never from a
+    // demo fallback (its id like 'user-admin-1' is not a UUID and breaks RLS).
     try {
       const stored = localStorage.getItem('agri_current_user');
       if (stored) {
@@ -40,27 +44,66 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const stale = (parsed?.name || '').toLowerCase().includes('jean') || parsed?.email === 'admin@agriapp.com';
         if (stale) {
           localStorage.removeItem('agri_current_user');
-        } else {
+        } else if (!isSupabaseConfigured()) {
           return parsed;
+        } else if (parsed && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(parsed.id || '')) {
+          return parsed;
+        } else {
+          localStorage.removeItem('agri_current_user');
         }
       }
     } catch (e) {
       console.error(e);
     }
-    const profiles = dbStore.getProfiles();
-    return profiles[0] || {
-      id: 'user-admin-1',
-      email: 'pondycode@gmail.com',
-      name: 'Pondycode',
-      role: 'admin',
-      farm_id: 'farm-1',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
+    if (!isSupabaseConfigured()) {
+      const profiles = dbStore.getProfiles();
+      return profiles[0] || {
+        id: 'user-admin-1',
+        email: 'pondycode@gmail.com',
+        name: 'Pondycode',
+        role: 'admin',
+        farm_id: 'farm-1',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+    }
+    return null;
   });
+  // True only after the Supabase session has been checked at boot.
+  const [ready, setReady] = useState(() => !isSupabaseConfigured());
   const [loading, setLoading] = useState<boolean>(false);
   const [farms, setFarms] = useState<Farm[]>([]);
   const [activeFarmId, setActiveFarmId] = useState<string | null>(null);
+
+  // Restore a real Supabase session on refresh so protected pages (and the
+  // post-login redirect) work after a page reload.
+  useEffect(() => {
+    if (!isSupabaseConfigured()) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase.auth.getSession();
+      if (cancelled) return;
+      if (data.session) {
+        let p: Profile | null = null;
+        try {
+          p = await getMyProfile();
+          if (!p) p = await ensureMyProfile('', data.session.user.email || '');
+        } catch (err) {
+          console.error('[auth] session restore profile:', err);
+        }
+        if (!cancelled && p) {
+          setUser(p);
+          if (p.farm_id) {
+            setActiveFarmId(p.farm_id);
+            void activateFarm(p);
+            void listUserFarms().then((f) => { if (f.length > 0) setFarms(f); });
+          }
+        }
+      }
+      if (!cancelled) setReady(true);
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     if (user) {
@@ -70,12 +113,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [user]);
 
+  // Only auto-activate a real tenant user. Demo/local profiles (non-UUID ids,
+  // e.g. 'user-admin-1' / farm 'farm-1') must never be pushed into Supabase.
   useEffect(() => {
-    if (user?.farm_id) {
-      setActiveFarmId(user.farm_id);
-      void activateFarm(user);
-      void listUserFarms().then((f) => { if (f.length > 0) setFarms(f); });
+    if (!user?.farm_id) return;
+    if (isSupabaseConfigured() && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(user.id || '')) {
+      return;
     }
+    setActiveFarmId(user.farm_id);
+    void activateFarm(user);
+    void listUserFarms().then((f) => { if (f.length > 0) setFarms(f); });
   }, [user?.farm_id]);
 
   // Activate the tenant + load the farm list after a successful login, but
@@ -289,6 +336,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       value={{
         user,
         loading,
+        ready,
         farms,
         activeFarmId,
         isSuperAdmin: user?.is_superadmin === true,

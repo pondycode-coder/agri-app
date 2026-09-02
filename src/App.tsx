@@ -26,8 +26,8 @@ import { RoleGuard } from "./components/RoleGuard";
 
 // Private route component
 const PrivateRoute = ({ children }: { children: React.ReactElement }) => {
-  const { user, loading } = useAuth();
-  if (loading) return <div>Loading...</div>;
+  const { user, loading, ready } = useAuth();
+  if (loading || !ready) return <div>Loading...</div>;
   return user ? children : <Navigate to="/login" replace />;
 };
 
