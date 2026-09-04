@@ -143,6 +143,7 @@ export interface Worker {
   role: 'field_worker' | 'agronomist' | 'machine_operator' | 'supervisor';
   phone_number: string;
   farm_id: string;
+  daily_wage: number;
   is_active: boolean;
   total_tasks_completed: number;
   productivity_score: number; // 1 to 5

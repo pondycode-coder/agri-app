@@ -110,11 +110,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
         if (!cancelled && p) {
           setUser(p);
-          if (p.farm_id) {
-            setActiveFarmId(p.farm_id);
-void activateFarm(p);
-          void listUserFarms().then((m) => { if (m.length > 0) applyFarms(m); });
-          }
         }
       }
       if (!cancelled) setReady(true);
@@ -133,21 +128,22 @@ void activateFarm(p);
   // Only auto-activate a real tenant user. Demo/local profiles (non-UUID ids,
   // e.g. 'user-admin-1' / farm 'farm-1') must never be pushed into Supabase.
   useEffect(() => {
-    if (!user?.farm_id) return;
+    if (!user?.id) return;
     if (isSupabaseConfigured() && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(user.id || '')) {
       return;
     }
-    setActiveFarmId(user.farm_id);
+    const farmId = user.farm_id || '00000000-0000-4000-8000-000000000001';
+    setActiveFarmId(farmId);
     void activateFarm(user);
     void listUserFarms().then((m) => { if (m.length > 0) applyFarms(m); });
-  }, [user?.farm_id]);
+  }, [user?.farm_id, user?.id]);
 
   // Activate the tenant + load the farm list after a successful login, but
   // never let a data-loading failure block the redirect — the user is already
   // authenticated at this point.
   const secureActivate = async (profile: Profile) => {
-    if (!profile.farm_id) return;
-    setActiveFarmId(profile.farm_id);
+    const farmId = profile.farm_id || '00000000-0000-4000-8000-000000000001';
+    setActiveFarmId(farmId);
     try {
       await activateFarm(profile);
     } catch (err) {
@@ -249,8 +245,9 @@ void activateFarm(p);
         }
         if (!newProf) throw new Error('Impossible de créer le compte.');
         setUser(newProf);
-        if (newProf.farm_id) {
-          setActiveFarmId(newProf.farm_id);
+        {
+          const farmId = newProf.farm_id || '00000000-0000-4000-8000-000000000001';
+          setActiveFarmId(farmId);
           await activateFarm(newProf);
           const memberships = await listUserFarms();
           if (memberships.length > 0) applyFarms(memberships);

@@ -1,13 +1,14 @@
--- ---------------------------------------------------------------------------
--- Role-based access on the DATABASE (RBAC). Fully idempotent — safe to
--- re-run even if partially applied.
--- ---------------------------------------------------------------------------
+-- ============================================================================
+-- COMBINED IDEMPOTENT MIGRATION — paste into Supabase SQL Editor
+-- Safe to re-run. Covers: migrations 12 + 13 + 14 in one shot.
+-- ============================================================================
 
 SET check_function_bodies = false;
 
--- ------------------------------------------------------------------
--- role_permissions table + seed data
--- ------------------------------------------------------------------
+-- ============================================================================
+-- STEP 1: role_permissions table + seed data + helper functions
+-- ============================================================================
+
 create table if not exists public.role_permissions (
   role text not null check (role in ('admin', 'manager', 'worker')),
   resource text not null,
@@ -45,9 +46,6 @@ from (values
 ) as r(role, resource, action)
 on conflict (role, resource, action) do nothing;
 
--- ------------------------------------------------------------------
--- has_permission / my_farm_role functions
--- ------------------------------------------------------------------
 create or replace function public.has_permission(p_role text, p_resource text, p_action text)
 returns boolean
 language sql stable
@@ -80,11 +78,10 @@ $$;
 grant execute on function public.has_permission(text, text, text) to authenticated;
 grant execute on function public.my_farm_role(uuid) to authenticated;
 
--- ------------------------------------------------------------------
--- Tenant table RLS policies (drop old, create new — idempotent)
--- ------------------------------------------------------------------
+-- ============================================================================
+-- STEP 2: Tenant table RLS policies (farms, plots, crops, contacts, inventory)
+-- ============================================================================
 
--- farms
 drop policy if exists "farms_select_own" on public.farms;
 drop policy if exists "farms_insert_own" on public.farms;
 drop policy if exists "farms_update_own" on public.farms;
@@ -103,7 +100,6 @@ create policy "farms_update_role" on public.farms
 create policy "farms_delete_role" on public.farms
   for delete using (id = public.current_farm_id() and public.has_permission(public.my_farm_role(id), 'farms', 'delete'));
 
--- plots
 drop policy if exists "plots_select_own" on public.plots;
 drop policy if exists "plots_insert_own" on public.plots;
 drop policy if exists "plots_update_own" on public.plots;
@@ -122,7 +118,6 @@ create policy "plots_update_role" on public.plots
 create policy "plots_delete_role" on public.plots
   for delete using (farm_id = public.current_farm_id() and public.has_permission(public.my_farm_role(farm_id), 'plots', 'delete'));
 
--- crop_cycles (scoped via plot_id -> plots.farm_id)
 drop policy if exists "crops_select_own" on public.crop_cycles;
 drop policy if exists "crops_insert_own" on public.crop_cycles;
 drop policy if exists "crops_update_own" on public.crop_cycles;
@@ -151,7 +146,6 @@ create policy "crops_delete_role" on public.crop_cycles
     plot_id in (select id from public.plots where farm_id = public.current_farm_id())
     and public.has_permission(public.my_farm_role(public.current_farm_id()), 'crops', 'delete'));
 
--- contacts (farm_id optional)
 drop policy if exists "contacts_select_own" on public.contacts;
 drop policy if exists "contacts_insert_own" on public.contacts;
 drop policy if exists "contacts_update_own" on public.contacts;
@@ -180,7 +174,6 @@ create policy "contacts_delete_role" on public.contacts
     coalesce(farm_id, public.current_farm_id()) = public.current_farm_id()
     and public.has_permission(public.my_farm_role(public.current_farm_id()), 'contacts', 'delete'));
 
--- inventory_items
 drop policy if exists "inventory_select_own" on public.inventory_items;
 drop policy if exists "inventory_insert_own" on public.inventory_items;
 drop policy if exists "inventory_update_own" on public.inventory_items;
@@ -199,7 +192,10 @@ create policy "inventory_update_role" on public.inventory_items
 create policy "inventory_delete_role" on public.inventory_items
   for delete using (farm_id = public.current_farm_id() and public.has_permission(public.my_farm_role(farm_id), 'inventory', 'delete'));
 
--- workers
+-- ============================================================================
+-- STEP 3: Tenant table RLS policies (workers, tasks, financials, investments)
+-- ============================================================================
+
 drop policy if exists "workers_select_own" on public.workers;
 drop policy if exists "workers_insert_own" on public.workers;
 drop policy if exists "workers_update_own" on public.workers;
@@ -218,7 +214,6 @@ create policy "workers_update_role" on public.workers
 create policy "workers_delete_role" on public.workers
   for delete using (farm_id = public.current_farm_id() and public.has_permission(public.my_farm_role(farm_id), 'workers', 'delete'));
 
--- farm_tasks
 drop policy if exists "tasks_select_own" on public.farm_tasks;
 drop policy if exists "tasks_insert_own" on public.farm_tasks;
 drop policy if exists "tasks_update_own" on public.farm_tasks;
@@ -237,7 +232,6 @@ create policy "tasks_update_role" on public.farm_tasks
 create policy "tasks_delete_role" on public.farm_tasks
   for delete using (farm_id = public.current_farm_id() and public.has_permission(public.my_farm_role(farm_id), 'tasks', 'delete'));
 
--- financial_records
 drop policy if exists "financials_select_own" on public.financial_records;
 drop policy if exists "financials_insert_own" on public.financial_records;
 drop policy if exists "financials_update_own" on public.financial_records;
@@ -256,7 +250,6 @@ create policy "financials_update_role" on public.financial_records
 create policy "financials_delete_role" on public.financial_records
   for delete using (farm_id = public.current_farm_id() and public.has_permission(public.my_farm_role(farm_id), 'financials', 'delete'));
 
--- investments (farm_id optional)
 drop policy if exists "investments_select_own" on public.investments;
 drop policy if exists "investments_insert_own" on public.investments;
 drop policy if exists "investments_update_own" on public.investments;
@@ -284,3 +277,142 @@ create policy "investments_delete_role" on public.investments
   for delete using (
     coalesce(farm_id, public.current_farm_id()) = public.current_farm_id()
     and public.has_permission(public.my_farm_role(public.current_farm_id()), 'investments', 'delete'));
+
+-- ============================================================================
+-- STEP 4: set_active_farm + admin permission RPCs
+-- ============================================================================
+
+create or replace function public.set_active_farm(p_farm_id uuid)
+returns boolean
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+  if not exists (
+    select 1 from public.user_farms
+    where user_id = auth.uid() and farm_id = p_farm_id
+  ) then
+    return false;
+  end if;
+  update public.profiles
+  set farm_id = p_farm_id, updated_at = now()
+  where id = auth.uid();
+  return true;
+end;
+$$;
+
+grant execute on function public.set_active_farm(uuid) to authenticated;
+
+create or replace function public.admin_list_permissions()
+returns table(role text, resource text, action text)
+language sql
+stable
+security definer set search_path = public
+as $$
+  select rp.role, rp.resource, rp.action
+  from public.role_permissions rp
+  where public.is_super_admin()
+$$;
+
+create or replace function public.admin_set_permission(
+  p_role text,
+  p_resource text,
+  p_action text,
+  p_allowed boolean
+)
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+  if not public.is_super_admin() then
+    raise exception 'forbidden';
+  end if;
+  if p_role not in ('admin', 'manager', 'worker') then
+    raise exception 'invalid role';
+  end if;
+  if p_role = 'admin' then
+    raise exception 'admin permissions are implicit';
+  end if;
+  if p_allowed then
+    insert into public.role_permissions (role, resource, action)
+    values (p_role, p_resource, p_action)
+    on conflict (role, resource, action) do nothing;
+  else
+    delete from public.role_permissions
+    where role = p_role and resource = p_resource and action = p_action;
+  end if;
+end;
+$$;
+
+create or replace function public.admin_reset_permissions()
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+  if not public.is_super_admin() then
+    raise exception 'forbidden';
+  end if;
+  delete from public.role_permissions where role in ('manager', 'worker');
+  insert into public.role_permissions (role, resource, action)
+  select r.role, r.resource, r.action
+  from (values
+    ('manager','farms','view'),('manager','farms','create'),('manager','farms','edit'),('manager','farms','delete'),
+    ('manager','plots','view'),('manager','plots','create'),('manager','plots','edit'),('manager','plots','delete'),
+    ('manager','crops','view'),('manager','crops','create'),('manager','crops','edit'),('manager','crops','delete'),
+    ('manager','inventory','view'),('manager','inventory','create'),('manager','inventory','edit'),('manager','inventory','delete'),
+    ('manager','workers','view'),('manager','workers','create'),('manager','workers','edit'),('manager','workers','delete'),
+    ('manager','tasks','view'),('manager','tasks','create'),('manager','tasks','edit'),('manager','tasks','delete'),
+    ('manager','contacts','view'),('manager','contacts','create'),('manager','contacts','edit'),('manager','contacts','delete'),
+    ('manager','financials','view'),
+    ('manager','investments','view'),
+    ('manager','profile','view'),('manager','profile','edit'),
+    ('manager','dashboard','view'),
+    ('worker','farms','view'),
+    ('worker','plots','view'),
+    ('worker','crops','view'),
+    ('worker','inventory','view'),
+    ('worker','tasks','view'),('worker','tasks','edit'),
+    ('worker','profile','view'),
+    ('worker','dashboard','view')
+  ) as r(role, resource, action)
+  on conflict (role, resource, action) do nothing;
+end;
+$$;
+
+grant execute on function public.admin_list_permissions() to authenticated;
+grant execute on function public.admin_set_permission(text, text, text, boolean) to authenticated;
+grant execute on function public.admin_reset_permissions() to authenticated;
+
+-- ============================================================================
+-- STEP 5: bootstrap_user_farm — breaks the RLS deadlock for new users
+-- ============================================================================
+
+create or replace function public.bootstrap_user_farm(p_user_id uuid, p_farm_id uuid)
+returns boolean
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+  insert into public.farms (id, name, location, size_in_hectares, description)
+  values (p_farm_id, 'Ma ferme', '', 0, '')
+  on conflict (id) do nothing;
+
+  insert into public.user_farms (user_id, farm_id, role)
+  values (p_user_id, p_farm_id, 'admin')
+  on conflict (user_id, farm_id) do nothing;
+
+  update public.profiles
+  set farm_id = p_farm_id, updated_at = now()
+  where id = p_user_id;
+
+  return true;
+end;
+$$;
+
+grant execute on function public.bootstrap_user_farm(uuid, uuid) to authenticated;
+
+-- ============================================================================
+-- DONE. If you see "Success", all migrations are applied.
+-- ============================================================================

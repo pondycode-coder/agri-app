@@ -1,18 +1,10 @@
 -- ---------------------------------------------------------------------------
--- Active-farm switching + SaaS-admin permission editor support.
---
--- 1) set_active_farm: switches the user's "current" farm in the DB so RLS
---    (current_farm_id()) and the per-farm role lookups follow the app's farm
---    switcher instead of being pinned to the primary farm.
--- 2) admin_list_permissions / admin_set_permission / admin_reset_permissions:
---    read & edit the role_permissions matrix (super-admin only).
+-- Active-farm switching + SaaS-admin permission editor. Fully idempotent.
 -- ---------------------------------------------------------------------------
 
 SET check_function_bodies = false;
 
--- ------------------------------------------------------------------
--- set_active_farm(farm_id): make a farm you belong to the active one.
--- ------------------------------------------------------------------
+-- set_active_farm
 create or replace function public.set_active_farm(p_farm_id uuid)
 returns boolean
 language plpgsql
@@ -34,25 +26,19 @@ $$;
 
 grant execute on function public.set_active_farm(uuid) to authenticated;
 
--- ------------------------------------------------------------------
--- admin_list_permissions(): the full matrix (super-admin only).
--- ------------------------------------------------------------------
+-- admin_list_permissions (table return for PostgREST compatibility)
 create or replace function public.admin_list_permissions()
-returns setof public.role_permissions
+returns table(role text, resource text, action text)
 language sql
 stable
 security definer set search_path = public
 as $$
-  select rp.*
+  select rp.role, rp.resource, rp.action
   from public.role_permissions rp
   where public.is_super_admin()
 $$;
 
--- ------------------------------------------------------------------
--- admin_set_permission(role, resource, action, allowed): grant/revoke
--- a single cell. The admin role is implicit (full access) and cannot
--- be edited.
--- ------------------------------------------------------------------
+-- admin_set_permission
 create or replace function public.admin_set_permission(
   p_role text,
   p_resource text,
@@ -84,10 +70,7 @@ begin
 end;
 $$;
 
--- ------------------------------------------------------------------
--- admin_reset_permissions(): restore the built-in defaults for the
--- editable roles (manager / worker). Mirrors the matrix in rbac.ts.
--- ------------------------------------------------------------------
+-- admin_reset_permissions
 create or replace function public.admin_reset_permissions()
 returns void
 language plpgsql
@@ -101,7 +84,6 @@ begin
   insert into public.role_permissions (role, resource, action)
   select r.role, r.resource, r.action
   from (values
-    -- manager: full CRUD on operational resources ...
     ('manager','farms','view'),('manager','farms','create'),('manager','farms','edit'),('manager','farms','delete'),
     ('manager','plots','view'),('manager','plots','create'),('manager','plots','edit'),('manager','plots','delete'),
     ('manager','crops','view'),('manager','crops','create'),('manager','crops','edit'),('manager','crops','delete'),
@@ -109,12 +91,10 @@ begin
     ('manager','workers','view'),('manager','workers','create'),('manager','workers','edit'),('manager','workers','delete'),
     ('manager','tasks','view'),('manager','tasks','create'),('manager','tasks','edit'),('manager','tasks','delete'),
     ('manager','contacts','view'),('manager','contacts','create'),('manager','contacts','edit'),('manager','contacts','delete'),
-    -- ... read-only finance & investments ...
     ('manager','financials','view'),
     ('manager','investments','view'),
     ('manager','profile','view'),('manager','profile','edit'),
     ('manager','dashboard','view'),
-    -- worker: read operational state, may update (not delete) their tasks
     ('worker','farms','view'),
     ('worker','plots','view'),
     ('worker','crops','view'),

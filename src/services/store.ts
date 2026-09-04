@@ -37,6 +37,14 @@ class LocalDatabaseStore {
   private remote: SupabaseBackend | null = null;
   private remoteQueue: Promise<void> = Promise.resolve();
 
+  /** Last remote-sync error message (null when in sync). UI can subscribe. */
+  private _lastSyncError: string | null = null;
+  public get lastSyncError(): string | null { return this._lastSyncError; }
+  private setSyncError(msg: string | null) {
+    this._lastSyncError = msg;
+    this.notify();
+  }
+
   public attachRemote(backend: SupabaseBackend | null) {
     this.remote = backend;
     if (backend) void this.pushAllToRemote();
@@ -50,15 +58,29 @@ class LocalDatabaseStore {
     this.remoteQueue = this.remoteQueue.then(task).catch((e) => console.error(e));
   }
 
-  private async upsertRemote<T>(table: EntityKey, rows: T[]) {
-    if (!this.remote?.isActive()) return;
-    await this.remote.upsert(
+  private async upsertRemote<T>(table: EntityKey, rows: T[]): Promise<boolean> {
+    if (!this.remote?.isActive()) return true;
+    const currentFarmId = this.remote.farmId;
+    const filtered = currentFarmId
+      ? rows.filter((r) => {
+          const row = r as Record<string, unknown>;
+          if (!('farm_id' in row)) return true;
+          return row.farm_id === currentFarmId;
+        })
+      : rows;
+    if (filtered.length === 0) return true;
+    const result = await this.remote.upsert(
       table,
-      rows.map((r) => {
+      filtered.map((r) => {
         const { created_at, updated_at, ...rest } = r as Record<string, unknown>;
         return { ...rest, updated_at: new Date().toISOString() };
       }),
     );
+    if (!result.ok) {
+      console.warn(`[store] upsertRemote ${table} failed:`, result.error);
+      return false;
+    }
+    return true;
   }
 
   private async deleteRemote(table: EntityKey, id: string) {
@@ -69,7 +91,7 @@ class LocalDatabaseStore {
   private pushAllToRemote() {
     if (!this.remote?.isActive()) return;
     this.queueRemote(async () => {
-      await Promise.all([
+      const results = await Promise.all([
         this.upsertRemote<Farm>('farms', this.farms),
         this.upsertRemote<Plot>('plots', this.plots),
         this.upsertRemote<CropCycle>('crop_cycles', this.cropCycles),
@@ -80,6 +102,13 @@ class LocalDatabaseStore {
         this.upsertRemote<FinancialRecord>('financial_records', this.financials),
         this.upsertRemote<Investment>('investments', this.investments),
       ]);
+      if (results.every(Boolean)) {
+        this.setSyncError(null);
+      } else {
+        const failed = ['farms','plots','crop_cycles','contacts','inventory_items','workers','farm_tasks','financial_records','investments']
+          .filter((_, i) => !results[i]);
+        this.setSyncError(`Échec de synchronisation: ${failed.join(', ')} — vérifiez votre connexion et les permissions.`);
+      }
     });
   }
 
@@ -442,6 +471,7 @@ class LocalDatabaseStore {
         role: workerData.role || 'field_worker',
         phone_number: workerData.phone_number || '+237 600000000',
         farm_id: workerData.farm_id,
+        daily_wage: workerData.daily_wage ?? 0,
         is_active: workerData.is_active ?? true,
         total_tasks_completed: 0,
         productivity_score: 5.0,

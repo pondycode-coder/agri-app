@@ -65,10 +65,14 @@ export class SupabaseBackend {
   }
 
   // --- writes -----------------------------------------------------------
-  public async upsert(table: EntityKey, rows: Record<string, unknown>[]) {
-    if (!this.isActive() || rows.length === 0) return;
+  public async upsert(table: EntityKey, rows: Record<string, unknown>[]): Promise<{ ok: boolean; error?: string }> {
+    if (!this.isActive() || rows.length === 0) return { ok: true };
     const { error } = await supabase.from(table).upsert(rows as never);
-    if (error) console.error(`[supabase] upsert ${table}:`, error.message);
+    if (error) {
+      console.error(`[supabase] upsert ${table}:`, error.message);
+      return { ok: false, error: error.message };
+    }
+    return { ok: true };
   }
 
   public async remove(table: EntityKey, id: string) {
@@ -154,6 +158,21 @@ export class SupabaseBackend {
     const { error } = await supabase.rpc('set_active_farm', { p_farm_id: farmId } as never);
     if (error) console.error('[supabase] setActiveFarm:', error.message);
     return !error;
+  }
+
+  /** Bootstrap farm + membership + profile in one RPC (security definer).
+   *  Breaks the RLS deadlock that occurs when profiles.farm_id is NULL. */
+  public async bootstrapFarm(userId: string, farmId: string): Promise<boolean> {
+    if (!this.isConfigured()) return false;
+    const { error } = await supabase.rpc('bootstrap_user_farm', {
+      p_user_id: userId,
+      p_farm_id: farmId,
+    } as never);
+    if (error) {
+      console.error('[supabase] bootstrapFarm:', error.message);
+      return false;
+    }
+    return true;
   }
 
   /** List farms the current user belongs to, with their per-farm role. */

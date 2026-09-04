@@ -4,6 +4,10 @@ import { Profile, Farm, AdminFarm, AdminUser, AdminStats, AppRole, AuthEvent, Us
 
 let activeBackend: SupabaseBackend | null = null;
 let activeUser: Profile | null = null;
+// Guards against concurrent activateFarm runs (e.g. session-restore effect +
+// secureActivate racing). idempotent bootstrap + hydrate make double runs
+// harmless, but this prevents redundant RPC traffic.
+let activatePromise: Promise<void> | null = null;
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -21,7 +25,19 @@ export const SEED_FARM_UUID = '00000000-0000-4000-8000-000000000001';
  * Falls back gracefully (no-op) when Supabase is not configured.
  */
 export async function activateFarm(profile: Profile): Promise<void> {
-  if (!profile.farm_id) return;
+  if (activatePromise) return activatePromise;
+  activatePromise = doActivate(profile).finally(() => { activatePromise = null; });
+  return activatePromise;
+}
+
+async function doActivate(profile: Profile): Promise<void> {
+  // If the profile has no farm_id yet (e.g. freshly registered user whose
+  // handle_new_user trigger created the profile without one), default to the
+  // seed farm so the Supabase backend activates and bindProfileToFarm can
+  // set the real farm_id on the profile row.
+  if (!profile.farm_id) {
+    profile.farm_id = SEED_FARM_UUID;
+  }
 
   // In Supabase mode the farm id MUST be a real UUID. The demo tenant uses the
   // string 'farm-1' which is invalid for UUID columns/RLS, so map it (and any
@@ -35,9 +51,15 @@ export async function activateFarm(profile: Profile): Promise<void> {
   activeUser = profile;
 
   if (backend.isConfigured()) {
-    await backend.seedFarmIfEmpty(profile.farm_id);
-    await backend.ensureMembership(profile.id, profile.farm_id);
-    await backend.bindProfileToFarm(profile);
+    // Use the security-definer bootstrap function to break the RLS deadlock:
+    // farms INSERT needs current_farm_id() which needs profiles.farm_id
+    // which needs a farm to exist which needs farms INSERT...
+    const bootstrapped = await backend.bootstrapFarm(profile.id, profile.farm_id);
+    if (bootstrapped) {
+      // Ensure the session-level current_farm_id() is set so RLS policies
+      // for INSERT/UPDATE/DELETE resolve correctly.
+      await backend.setActiveFarm(profile.farm_id);
+    }
   }
 
   dbStore.attachRemote(backend);
