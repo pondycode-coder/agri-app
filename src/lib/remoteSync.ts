@@ -228,6 +228,12 @@ export async function setMyPin(pin: string): Promise<boolean> {
   return backend.setMyPin(pin);
 }
 
+/** Return true when the PIN is already in use by another account (Supabase only). */
+export async function isPinTaken(pin: string): Promise<boolean> {
+  const backend = activeBackend ?? new SupabaseBackend('');
+  return backend.isPinTaken(pin);
+}
+
 /** Super-admin sets/resets any user's PIN (Supabase only). */
 export async function adminSetPin(userId: string, pin: string): Promise<boolean> {
   if (!activeBackend?.isConfigured()) return false;

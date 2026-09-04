@@ -37,6 +37,28 @@ as $$
   )
 $$;
 
+-- Return true when a PIN is already in use (its derived email exists in
+-- auth.users for a DIFFERENT account). Used to block registration before
+-- creating the auth user, since supabase.auth.signUp can silently "succeed"
+-- for an existing email without surfacing an error.
+create or replace function public.pin_taken(p_pin text)
+returns boolean
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  v_email text;
+begin
+  if p_pin is null or not (p_pin ~ '^\d{4}$') then
+    return false;
+  end if;
+  v_email := p_pin || '@local.agri';
+  return exists (
+    select 1 from auth.users where email = v_email
+  );
+end;
+$$;
+
 -- A user may set (or change) their own PIN at registration / from their profile.
 -- Keeps the Supabase account password AND email in sync so the PIN remains
 -- valid for password-auth sign-in (the app derives email = <pin>@local.agri).
@@ -52,6 +74,14 @@ begin
     raise exception 'INVALID_PIN_FORMAT';
   end if;
   v_email := p_pin || '@local.agri';
+
+  -- Two users sharing the same PIN would clash on the derived email. Reject it.
+  if exists (
+    select 1 from auth.users where email = v_email and id <> auth.uid()
+  ) then
+    raise exception 'PIN_ALREADY_TAKEN';
+  end if;
+
   update public.profiles
   set pin = p_pin, email = v_email, updated_at = now()
   where id = auth.uid();
@@ -140,3 +170,4 @@ $$;
 
 grant execute on function public.set_my_pin(text) to authenticated;
 grant execute on function public.admin_set_pin(uuid, text) to authenticated;
+grant execute on function public.pin_taken(text) to authenticated;

@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { dbStore } from '../services/store';
 import { Profile, Farm, AppRole, UserFarmMembership } from '../types/database';
 import { hashPin, verifyPin, pinToSecret } from '../lib/pinAuth';
-import { activateFarm, detachFarm, listUserFarms, switchFarm as switchFarmRemote, createFarmAndSwitch, joinFarmAndSwitch, setMyPin, getMyProfile, ensureMyProfile } from '../lib/remoteSync';
+import { activateFarm, detachFarm, listUserFarms, switchFarm as switchFarmRemote, createFarmAndSwitch, joinFarmAndSwitch, setMyPin, getMyProfile, ensureMyProfile, isPinTaken } from '../lib/remoteSync';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 interface AuthContextType {
@@ -208,6 +208,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         throw new Error('Le PIN doit contenir exactement 4 chiffres.');
       }
       if (isSupabaseConfigured()) {
+        // Reject a PIN that is already in use before creating the auth user.
+        // The email is derived from the PIN (<pin>@local.agri), so a duplicate
+        // PIN means a duplicate email — but supabase.auth.signUp can silently
+        // "succeed" for an existing email, so we check explicitly first.
+        // isPinTaken returns false (falls back gracefully) if the RPC is not
+        // available, in which case signUp's own detection below still applies.
+        if (await isPinTaken(pin)) {
+          throw new Error('Ce PIN est déjà utilisé par un autre compte. Choisissez un autre code.');
+        }
         // Create the Supabase auth user using the PIN as its password (its
         // trigger creates the DB profile row). signUp also logs the user in,
         // giving a real session so RLS lets the app read their data.
@@ -234,11 +243,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             if (sm.includes('confirm') || sm.includes('not confirmed')) {
               throw new Error('Veuillez d\'abord confirmer votre email, puis réessayer.');
             }
+            // Sign-in with the derived email+password failed. If the PIN's
+            // derived email already belongs to an existing account, the takeaway
+            // is "this PIN is taken" (its password differs from ours).
+            if (sm.includes('invalid login') || sm.includes('invalid credentials')) {
+              throw new Error('Ce PIN est déjà utilisé par un autre compte. Choisissez un autre code.');
+            }
             throw si;
           }
         }
         // Store the PIN in the profiles column so it is visible to the admin.
-        await setMyPin(pin);
+        const pinOk = await setMyPin(pin);
+        if (!pinOk) {
+          // set_my_pin is security-definer and rejects a duplicate PIN with
+          // PIN_ALREADY_TAKEN; a failure here almost always means the PIN is
+          // already in use by another account.
+          throw new Error('Ce PIN est déjà utilisé par un autre compte. Choisissez un autre code.');
+        }
         let newProf = await getMyProfile();
         if (!newProf) {
           newProf = await ensureMyProfile(name || email.split('@')[0], email);

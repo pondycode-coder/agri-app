@@ -358,6 +358,17 @@ export class SupabaseBackend {
     return !error;
   }
 
+  /** Return true when the PIN is already in use by another account. */
+  public async isPinTaken(pin: string): Promise<boolean> {
+    if (!this.isConfigured()) return false;
+    const { data, error } = await supabase.rpc('pin_taken', { p_pin: pin } as never);
+    if (error) {
+      console.error('[supabase] pin_taken:', error.message);
+      return false;
+    }
+    return Boolean(data);
+  }
+
   /** Super-admin sets/resets any user's PIN. */
   public async adminSetPin(userId: string, pin: string): Promise<boolean> {
     if (!this.isConfigured()) return false;
