@@ -19,6 +19,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
+import { useI18n } from '@/context/I18nProvider';
 import {
   adminStats,
   adminListFarms,
@@ -47,23 +48,6 @@ type PermMap = Record<string, Record<string, Record<string, boolean>>>;
 const EDITABLE_ROLES: AppRole[] = ['manager', 'worker'];
 const EDITABLE_ACTIONS: PermissionAction[] = ['view', 'create', 'edit', 'delete'];
 
-const RESOURCE_LABELS: Record<string, string> = {
-  farms: 'Exploitations',
-  plots: 'Parcelles',
-  crops: 'Cultures',
-  inventory: 'Stock',
-  workers: 'Ouvriers',
-  tasks: 'Tâches',
-  financials: 'Finances',
-  contacts: 'Contacts',
-  investments: 'Investissements',
-  profile: 'Profil',
-  dashboard: 'Tableau de bord',
-};
-
-const ROLE_LABELS: Record<string, string> = { manager: 'Manager', worker: 'Ouvrier' };
-const ACTION_LABELS: Record<string, string> = { view: 'Voir', create: 'Créer', edit: 'Modifier', delete: 'Supprimer' };
-
 const buildEmptyPerms = (): PermMap =>
   Object.fromEntries(
     EDITABLE_ROLES.map((role) => [
@@ -77,6 +61,30 @@ const buildEmptyPerms = (): PermMap =>
 export default function SaasAdmin() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { t, locale } = useI18n();
+
+  const RESOURCE_LABELS: Record<string, string> = {
+    farms: t('saas.resFarm'),
+    plots: t('saas.resPlot'),
+    crops: t('saas.resCrop'),
+    inventory: t('saas.resInventory'),
+    workers: t('saas.resWorker'),
+    tasks: t('saas.resTask'),
+    financials: t('saas.resFinancial'),
+    contacts: t('saas.resContact'),
+    investments: t('saas.resInvestment'),
+    profile: t('saas.resProfile'),
+    dashboard: t('saas.resDashboard'),
+  };
+  const ROLE_LABELS: Record<string, string> = { manager: t('saas.roleManager'), worker: t('saas.roleWorker') };
+  const ACTION_LABELS: Record<string, string> = {
+    view: t('saas.permsActionView'),
+    create: t('saas.permsActionCreate'),
+    edit: t('saas.permsActionEdit'),
+    delete: t('saas.permsActionDelete'),
+  };
+  const localeTag = locale === 'en' ? 'en-US' : 'fr-FR';
+
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [stats, setStats] = useState<AdminStats | null>(null);
@@ -123,7 +131,7 @@ export default function SaasAdmin() {
     setBusy(true);
     try {
       const ok = await action();
-      toast(ok ? { title: okTitle } : { title: 'Action refusée', variant: 'destructive' });
+      toast(ok ? { title: okTitle } : { title: t('saas.toast.denied'), variant: 'destructive' });
       await load();
     } finally {
       setBusy(false);
@@ -131,16 +139,19 @@ export default function SaasAdmin() {
   };
 
   const handleRoleChange = (userId: string, role: AppRole) =>
-    runAction(() => adminSetRole(userId, role), 'Rôle mis à jour');
+    runAction(() => adminSetRole(userId, role), t('saas.toast.roleUpdated'));
 
   const handleSuperadminToggle = (u: AdminUser) =>
-    runAction(() => adminSetSuperadmin(u.id, !u.is_superadmin), u.is_superadmin ? 'Super-admin révoqué' : 'Super-admin accordé');
+    runAction(
+      () => adminSetSuperadmin(u.id, !u.is_superadmin),
+      u.is_superadmin ? t('saas.toast.superadminRevoked') : t('saas.toast.superadminGranted'),
+    );
 
   const handleMoveUser = (userId: string, farmId: string) =>
-    runAction(() => adminMoveUser(userId, farmId), 'Utilisateur déplacé');
+    runAction(() => adminMoveUser(userId, farmId), t('saas.toast.userMoved'));
 
   const handleDeleteFarm = (farmId: string) =>
-    runAction(() => adminDeleteFarm(farmId), 'Ferme supprimée');
+    runAction(() => adminDeleteFarm(farmId), t('saas.toast.farmDeleted'));
 
   const openPinDialog = (userId: string, userName: string) => {
     setPinTargetUser({ id: userId, name: userName });
@@ -154,12 +165,12 @@ export default function SaasAdmin() {
     try {
       const ok = await adminSetPin(pinTargetUser.id, newPin);
       if (ok) {
-        toast({ title: `PIN mis à jour pour ${pinTargetUser.name}` });
+        toast({ title: `${t('saas.toast.pinUpdated')} ${pinTargetUser.name}` });
         setPinDialogOpen(false);
         await load();
       }
     } catch (err) {
-      toast({ title: 'Impossible de mettre à jour le PIN', description: err instanceof Error ? err.message : undefined, variant: 'destructive' });
+      toast({ title: t('saas.toast.pinUpdateFailed'), description: err instanceof Error ? err.message : undefined, variant: 'destructive' });
     } finally {
       setPinSaving(false);
     }
@@ -189,17 +200,17 @@ export default function SaasAdmin() {
         }
       }
       if (changes.length === 0) {
-        toast({ title: 'Aucune modification à enregistrer.' });
+        toast({ title: t('saas.toast.noPermChanges') });
         return;
       }
       for (const c of changes) {
         const ok = await adminSetPermission(c.role, c.resource, c.action, c.allowed);
         if (!ok) {
-          toast({ title: 'Échec de la mise à jour des permissions', variant: 'destructive' });
+          toast({ title: t('saas.toast.permsUpdateFailed'), variant: 'destructive' });
           return;
         }
       }
-      toast({ title: `${changes.length} autorisation(s) mise(s) à jour` });
+      toast({ title: `${changes.length} ${t('saas.toast.permsUpdatedCount')}` });
       await loadPerms();
     } finally {
       setBusy(false);
@@ -210,7 +221,11 @@ export default function SaasAdmin() {
     setBusy(true);
     try {
       const ok = await adminResetPermissions();
-      toast(ok ? { title: 'Permissions rétablies aux valeurs par défaut' } : { title: 'Action refusée', variant: 'destructive' });
+      toast(
+        ok
+          ? { title: t('saas.toast.permsResetDone') }
+          : { title: t('saas.toast.denied'), variant: 'destructive' },
+      );
       await loadPerms();
     } finally {
       setBusy(false);
@@ -223,11 +238,8 @@ export default function SaasAdmin() {
         <Card className="max-w-xl mx-auto mt-10">
           <CardContent className="pt-6 text-center space-y-3">
             <ShieldCheck className="h-10 w-10 mx-auto text-slate-400" />
-            <h2 className="text-xl font-bold">Accès réservé aux super-administrateurs</h2>
-            <p className="text-sm text-slate-500">
-              La première exploitation qui s'inscrit sur la plateforme reçoit le statut super-admin.
-              Votre compte n'a pas (encore) ce rôle.
-            </p>
+            <h2 className="text-xl font-bold">{t('saas.unauthorized')}</h2>
+            <p className="text-sm text-slate-500">{t('saas.unauthorizedDesc')}</p>
           </CardContent>
         </Card>
       </MainLayout>
@@ -235,13 +247,13 @@ export default function SaasAdmin() {
   }
 
   const statCards: Array<{ label: string; value: string; icon: typeof Building2 }> = [
-    { label: 'Fermes', value: String(stats?.total_farms ?? 0), icon: Building2 },
-    { label: 'Utilisateurs', value: String(stats?.total_users ?? 0), icon: Users },
-    { label: 'Parcelles', value: String(stats?.total_plots ?? 0), icon: LandPlot },
-    { label: 'Ouvriers', value: String(stats?.total_workers ?? 0), icon: Users },
-    { label: 'Tâches', value: String(stats?.total_tasks ?? 0), icon: ListChecks },
-    { label: 'Revenus', value: formatFCFA(stats?.total_income ?? 0), icon: Wallet },
-    { label: 'Dépenses', value: formatFCFA(stats?.total_expenses ?? 0), icon: Wallet },
+    { label: t('saas.statFarms'), value: String(stats?.total_farms ?? 0), icon: Building2 },
+    { label: t('saas.statUsers'), value: String(stats?.total_users ?? 0), icon: Users },
+    { label: t('saas.statPlots'), value: String(stats?.total_plots ?? 0), icon: LandPlot },
+    { label: t('saas.statWorkers'), value: String(stats?.total_workers ?? 0), icon: Users },
+    { label: t('saas.statTasks'), value: String(stats?.total_tasks ?? 0), icon: ListChecks },
+    { label: t('saas.statIncome'), value: formatFCFA(stats?.total_income ?? 0), icon: Wallet },
+    { label: t('saas.statExpenses'), value: formatFCFA(stats?.total_expenses ?? 0), icon: Wallet },
   ];
 
   return (
@@ -251,23 +263,20 @@ export default function SaasAdmin() {
           <div>
             <h1 className="text-2xl font-bold flex items-center gap-2">
               <ShieldCheck className="h-6 w-6 text-amber-500" />
-              SaaS Admin
+              {t('saas.title')}
             </h1>
-            <p className="text-sm text-slate-500 mt-1">
-              Vue plateforme : toutes les exploitations et tous les comptes.
-            </p>
+            <p className="text-sm text-slate-500 mt-1">{t('saas.subtitle')}</p>
           </div>
           <Button variant="outline" onClick={() => void load()} disabled={loading}>
             <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-            Actualiser
+            {t('saas.refresh')}
           </Button>
         </div>
 
         {!isSupabaseConfigured() && (
           <Card className="border-amber-300 bg-amber-50 dark:bg-amber-950/30">
             <CardContent className="pt-6 text-sm text-amber-800 dark:text-amber-200">
-              Ces outils nécessitent une connexion Supabase. En mode démo local, le rôle super-admin
-              n'est pas appliqué.
+              {t('saas.demoModeNotice')}
             </CardContent>
           </Card>
         )}
@@ -287,10 +296,10 @@ export default function SaasAdmin() {
 
         <Tabs defaultValue="farms">
           <TabsList>
-            <TabsTrigger value="farms">Exploitations ({farms.length})</TabsTrigger>
-            <TabsTrigger value="users">Comptes ({users.length})</TabsTrigger>
-            <TabsTrigger value="activity">Activité ({events.length})</TabsTrigger>
-            <TabsTrigger value="permissions">Permissions</TabsTrigger>
+            <TabsTrigger value="farms">{t('saas.tabFarms')} ({farms.length})</TabsTrigger>
+            <TabsTrigger value="users">{t('saas.tabUsers')} ({users.length})</TabsTrigger>
+            <TabsTrigger value="activity">{t('saas.tabActivity')} ({events.length})</TabsTrigger>
+            <TabsTrigger value="permissions">{t('saas.tabPermissions')}</TabsTrigger>
           </TabsList>
 
           <TabsContent value="farms" className="space-y-4">
@@ -299,15 +308,15 @@ export default function SaasAdmin() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Ferme</TableHead>
-                      <TableHead>Localisation</TableHead>
-                      <TableHead>Ha</TableHead>
-                      <TableHead>Parcelles</TableHead>
-                      <TableHead>Membres</TableHead>
-                      <TableHead>Revenus</TableHead>
-                      <TableHead>Dépenses</TableHead>
-                      <TableHead>Créée le</TableHead>
-                      <TableHead className="text-right">Action</TableHead>
+                      <TableHead>{t('saas.farmColName')}</TableHead>
+                      <TableHead>{t('saas.farmColLocation')}</TableHead>
+                      <TableHead>{t('saas.farmColHa')}</TableHead>
+                      <TableHead>{t('saas.farmColPlots')}</TableHead>
+                      <TableHead>{t('saas.farmColMembers')}</TableHead>
+                      <TableHead>{t('saas.farmColIncome')}</TableHead>
+                      <TableHead>{t('saas.farmColExpenses')}</TableHead>
+                      <TableHead>{t('saas.farmColCreated')}</TableHead>
+                      <TableHead className="text-right">{t('saas.farmColAction')}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -320,7 +329,7 @@ export default function SaasAdmin() {
                         <TableCell>{farm.users_count}</TableCell>
                         <TableCell>{formatFCFA(farm.total_income)}</TableCell>
                         <TableCell>{formatFCFA(farm.total_expenses)}</TableCell>
-                        <TableCell>{new Date(farm.created_at).toLocaleDateString('fr-FR')}</TableCell>
+                        <TableCell>{new Date(farm.created_at).toLocaleDateString(localeTag)}</TableCell>
                         <TableCell className="text-right">
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
@@ -330,16 +339,17 @@ export default function SaasAdmin() {
                             </AlertDialogTrigger>
                             <AlertDialogContent>
                               <AlertDialogHeader>
-                                <AlertDialogTitle>Supprimer « {farm.name} » ?</AlertDialogTitle>
+                                <AlertDialogTitle>
+                                  {t('saas.farmDeleteTitle')} « {farm.name} » ?
+                                </AlertDialogTitle>
                                 <AlertDialogDescription>
-                                  Toutes les données liées à cette exploitation seront supprimées définitivement.
-                                  Cette action est irréversible.
+                                  {t('saas.farmDeleteDesc')}
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
-                                <AlertDialogCancel disabled={busy}>Annuler</AlertDialogCancel>
+                                <AlertDialogCancel disabled={busy}>{t('common.cancel')}</AlertDialogCancel>
                                 <AlertDialogAction onClick={() => void handleDeleteFarm(farm.id)} disabled={busy} className="bg-red-600 hover:bg-red-700">
-                                  Supprimer
+                                  {t('common.delete')}
                                 </AlertDialogAction>
                               </AlertDialogFooter>
                             </AlertDialogContent>
@@ -350,7 +360,7 @@ export default function SaasAdmin() {
                     {farms.length === 0 && (
                       <TableRow>
                         <TableCell colSpan={9} className="text-center text-slate-400 py-6">
-                          Aucune exploitation.
+                          {t('saas.emptyFarms')}
                         </TableCell>
                       </TableRow>
                     )}
@@ -366,13 +376,13 @@ export default function SaasAdmin() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Nom</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Rôle</TableHead>
-                      <TableHead>Exploitation</TableHead>
-                      <TableHead>Super-admin</TableHead>
-                      <TableHead>PIN</TableHead>
-                      <TableHead>Inscrit le</TableHead>
+                      <TableHead>{t('saas.userColName')}</TableHead>
+                      <TableHead>{t('saas.userColEmail')}</TableHead>
+                      <TableHead>{t('saas.userColRole')}</TableHead>
+                      <TableHead>{t('saas.userColFarm')}</TableHead>
+                      <TableHead>{t('saas.userColSuperadmin')}</TableHead>
+                      <TableHead>{t('saas.userColPin')}</TableHead>
+                      <TableHead>{t('saas.userColCreated')}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -386,9 +396,9 @@ export default function SaasAdmin() {
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="admin">Admin</SelectItem>
-                              <SelectItem value="manager">Manager</SelectItem>
-                              <SelectItem value="worker">Ouvrier</SelectItem>
+                              <SelectItem value="admin">{t('saas.roleAdmin')}</SelectItem>
+                              <SelectItem value="manager">{t('saas.roleManager')}</SelectItem>
+                              <SelectItem value="worker">{t('saas.roleWorker')}</SelectItem>
                             </SelectContent>
                           </Select>
                         </TableCell>
@@ -399,11 +409,11 @@ export default function SaasAdmin() {
                             disabled={busy}
                           >
                             <SelectTrigger className="w-44 h-8 text-xs">
-                              <SelectValue placeholder={u.farm_name || 'Aucune ferme'} />
+                              <SelectValue placeholder={u.farm_name || t('saas.noFarm')} />
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="none" disabled>
-                                {u.farm_name || 'Aucune ferme'}
+                                {u.farm_name || t('saas.noFarm')}
                               </SelectItem>
                               {farms
                                 .filter((f) => f.id !== u.farm_id)
@@ -424,7 +434,7 @@ export default function SaasAdmin() {
                             disabled={busy}
                           >
                             {u.is_superadmin ? <Check className="h-3.5 w-3.5 mr-1.5" /> : <Ban className="h-3.5 w-3.5 mr-1.5" />}
-                            {u.is_superadmin ? 'Super-admin' : 'Promouvoir'}
+                            {u.is_superadmin ? t('saas.superadmin') : t('saas.promote')}
                           </Button>
                         </TableCell>
                         <TableCell>
@@ -440,17 +450,17 @@ export default function SaasAdmin() {
                               disabled={busy}
                             >
                               {u.pin ? <Edit3 className="h-3.5 w-3.5 mr-1" /> : <Key className="h-3.5 w-3.5 mr-1" />}
-                              {u.pin ? 'Modifier' : 'Définir'}
+                              {u.pin ? t('saas.editPin') : t('saas.setPin')}
                             </Button>
                           </div>
                         </TableCell>
-                        <TableCell>{new Date(u.created_at).toLocaleDateString('fr-FR')}</TableCell>
+                        <TableCell>{new Date(u.created_at).toLocaleDateString(localeTag)}</TableCell>
                       </TableRow>
                     ))}
                     {users.length === 0 && (
                       <TableRow>
                         <TableCell colSpan={7} className="text-center text-slate-400 py-6">
-                          Aucun compte.
+                          {t('saas.emptyUsers')}
                         </TableCell>
                       </TableRow>
                     )}
@@ -466,10 +476,10 @@ export default function SaasAdmin() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Utilisateur</TableHead>
-                      <TableHead>Exploitation</TableHead>
-                      <TableHead>Événement</TableHead>
-                      <TableHead>Date / Heure</TableHead>
+                      <TableHead>{t('saas.activityColUser')}</TableHead>
+                      <TableHead>{t('saas.activityColFarm')}</TableHead>
+                      <TableHead>{t('saas.activityColEvent')}</TableHead>
+                      <TableHead>{t('saas.activityColDate')}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -483,23 +493,23 @@ export default function SaasAdmin() {
                         <TableCell>
                           {ev.event_type === 'login' ? (
                             <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
-                              <LogIn className="h-3.5 w-3.5" /> Connexion
+                              <LogIn className="h-3.5 w-3.5" /> {t('saas.eventLogin')}
                             </span>
                           ) : (
                             <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-100 px-2 py-0.5 text-xs font-medium text-rose-700">
-                              <LogOut className="h-3.5 w-3.5" /> Déconnexion
+                              <LogOut className="h-3.5 w-3.5" /> {t('saas.eventLogout')}
                             </span>
                           )}
                         </TableCell>
                         <TableCell className="whitespace-nowrap text-slate-500">
-                          {new Date(ev.created_at).toLocaleString('fr-FR')}
+                          {new Date(ev.created_at).toLocaleString(localeTag)}
                         </TableCell>
                       </TableRow>
                     ))}
                     {events.length === 0 && (
                       <TableRow>
                         <TableCell colSpan={4} className="text-center text-slate-400 py-6">
-                          Aucune activité enregistrée.
+                          {t('saas.emptyActivity')}
                         </TableCell>
                       </TableRow>
                     )}
@@ -513,14 +523,14 @@ export default function SaasAdmin() {
               <CardContent className="pt-6">
                 <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
                   <div>
-                    <p className="text-sm font-semibold">Matrice des permissions</p>
+                    <p className="text-sm font-semibold">{t('saas.permsTitle')}</p>
                     <p className="text-xs text-slate-500 mt-0.5">
-                      Appliquée côté base de données (RLS) et côté application. Le rôle <b>Admin</b> garde toujours un accès complet (non modifiable).
+                      {t('saas.permsDesc')} <b>{t('saas.roleAdmin')}</b> {t('saas.permsAdminNote')}
                     </p>
                   </div>
                   <div className="flex gap-2">
                     <Button variant="outline" size="sm" onClick={() => void resetPerms()} disabled={busy}>
-                      Rétablir l'état par défaut
+                      {t('saas.permsReset')}
                     </Button>
                     <Button
                       size="sm"
@@ -528,7 +538,7 @@ export default function SaasAdmin() {
                       onClick={() => void savePerms()}
                       disabled={busy || !permsDirty}
                     >
-                      {busy ? 'Enregistrement...' : 'Enregistrer'}
+                      {busy ? t('saas.permsSaving') : t('saas.permsSave')}
                     </Button>
                   </div>
                 </div>
@@ -546,7 +556,7 @@ export default function SaasAdmin() {
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead className="w-48">Module</TableHead>
+                            <TableHead className="w-48">{t('saas.permsModule')}</TableHead>
                             {EDITABLE_ACTIONS.map((a) => (
                               <TableHead key={a} className="text-center min-w-20">
                                 {ACTION_LABELS[a]}
@@ -583,22 +593,24 @@ export default function SaasAdmin() {
         <Dialog open={pinDialogOpen} onOpenChange={setPinDialogOpen}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Définir le PIN de {pinTargetUser?.name}</DialogTitle>
+              <DialogTitle>
+                {t('saas.pinDialogTitle')} {pinTargetUser?.name}
+              </DialogTitle>
             </DialogHeader>
             <div className="space-y-3 py-2">
-              <Label className="text-sm text-slate-500">Nouveau code PIN (4 chiffres)</Label>
+              <Label className="text-sm text-slate-500">{t('saas.pinDialogLabel')}</Label>
               <PinInput value={newPin} onChange={setNewPin} />
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setPinDialogOpen(false)} disabled={pinSaving}>
-                Annuler
+                {t('common.cancel')}
               </Button>
               <Button
                 onClick={() => void handleSavePin()}
                 disabled={pinSaving || newPin.length !== 4}
                 className="bg-emerald-600 hover:bg-emerald-700"
               >
-                {pinSaving ? 'Enregistrement...' : 'Enregistrer'}
+                {pinSaving ? t('saas.permsSaving') : t('saas.permsSave')}
               </Button>
             </DialogFooter>
           </DialogContent>
