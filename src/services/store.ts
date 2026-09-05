@@ -374,6 +374,7 @@ class LocalDatabaseStore {
         expected_harvest_date: cropData.expected_harvest_date || new Date(Date.now() + 180 * 86400000).toISOString().split('T')[0],
         actual_harvest_date: cropData.actual_harvest_date,
         yield_in_kg: cropData.yield_in_kg,
+        yield_unit: cropData.yield_unit || 'bunch',
         status: cropData.status || 'planted',
         estimated_cost_fcfa: cropData.estimated_cost_fcfa || 0,
         revenue_fcfa: cropData.revenue_fcfa || 0,

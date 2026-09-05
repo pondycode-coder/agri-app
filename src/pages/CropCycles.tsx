@@ -25,6 +25,8 @@ const statusColors: Record<string, string> = {
 
 const todayIso = () => new Date().toISOString().split('T')[0];
 
+const YIELD_UNITS = ['bunch', 'bag'] as const;
+
 export default function CropCycles() {
   const { t } = useI18n();
   const { toast } = useToast();
@@ -34,7 +36,7 @@ export default function CropCycles() {
   const [editingCrop, setEditingCrop] = useState<CropCycle | null>(null);
   const [form, setForm] = useState({
     plot_id: '', crop_name: 'Cacao', variety: '', season: '', planting_date: '', expected_harvest_date: '',
-    actual_harvest_date: '', yield_in_kg: 0,
+    actual_harvest_date: '', yield_in_kg: 0, yield_unit: 'bunch' as string,
     status: 'planted' as CropCycle['status'], estimated_cost_fcfa: 0, revenue_fcfa: 0,
   });
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -57,6 +59,8 @@ export default function CropCycles() {
     (c.status === 'planted' || c.status === 'growing') &&
     Boolean(c.expected_harvest_date) &&
     c.expected_harvest_date < todayIso();
+
+  const yieldUnitLabel = (unit?: string) => (unit === 'bag' ? t('crops.unitBag') : t('crops.unitBunch'));
 
   const margin = (c: CropCycle) => (c.revenue_fcfa || 0) - c.estimated_cost_fcfa;
 
@@ -88,19 +92,19 @@ export default function CropCycles() {
 
   const openCreate = () => {
     setEditingCrop(null);
-    setForm({ plot_id: plots[0]?.id || '', crop_name: 'Cacao', variety: '', season: '', planting_date: todayIso(), expected_harvest_date: '', actual_harvest_date: '', yield_in_kg: 0, status: 'planted', estimated_cost_fcfa: 0, revenue_fcfa: 0 });
+    setForm({ plot_id: plots[0]?.id || '', crop_name: 'Cacao', variety: '', season: '', planting_date: todayIso(), expected_harvest_date: '', actual_harvest_date: '', yield_in_kg: 0, yield_unit: 'bunch', status: 'planted', estimated_cost_fcfa: 0, revenue_fcfa: 0 });
     setDialogOpen(true);
   };
 
   const openEdit = (crop: CropCycle) => {
     setEditingCrop(crop);
-    setForm({ plot_id: crop.plot_id, crop_name: crop.crop_name, variety: crop.variety, season: crop.season, planting_date: crop.planting_date, expected_harvest_date: crop.expected_harvest_date, actual_harvest_date: crop.actual_harvest_date || '', yield_in_kg: crop.yield_in_kg || 0, status: crop.status, estimated_cost_fcfa: crop.estimated_cost_fcfa, revenue_fcfa: crop.revenue_fcfa || 0 });
+    setForm({ plot_id: crop.plot_id, crop_name: crop.crop_name, variety: crop.variety, season: crop.season, planting_date: crop.planting_date, expected_harvest_date: crop.expected_harvest_date, actual_harvest_date: crop.actual_harvest_date || '', yield_in_kg: crop.yield_in_kg || 0, yield_unit: crop.yield_unit || 'bunch', status: crop.status, estimated_cost_fcfa: crop.estimated_cost_fcfa, revenue_fcfa: crop.revenue_fcfa || 0 });
     setDialogOpen(true);
   };
 
   const openHarvest = (crop: CropCycle) => {
     setEditingCrop(crop);
-    setForm({ plot_id: crop.plot_id, crop_name: crop.crop_name, variety: crop.variety, season: crop.season, planting_date: crop.planting_date, expected_harvest_date: crop.expected_harvest_date, actual_harvest_date: todayIso(), yield_in_kg: crop.yield_in_kg || 0, status: 'harvested', estimated_cost_fcfa: crop.estimated_cost_fcfa, revenue_fcfa: crop.revenue_fcfa || 0 });
+    setForm({ plot_id: crop.plot_id, crop_name: crop.crop_name, variety: crop.variety, season: crop.season, planting_date: crop.planting_date, expected_harvest_date: crop.expected_harvest_date, actual_harvest_date: todayIso(), yield_in_kg: crop.yield_in_kg || 0, yield_unit: crop.yield_unit || 'bunch', status: 'harvested', estimated_cost_fcfa: crop.estimated_cost_fcfa, revenue_fcfa: crop.revenue_fcfa || 0 });
     setDialogOpen(true);
   };
 
@@ -109,6 +113,7 @@ export default function CropCycles() {
     dbStore.saveCropCycle({
       ...form,
       id: editingCrop?.id,
+      yield_unit: form.yield_unit || 'bunch',
       actual_harvest_date: form.status === 'harvested' ? form.actual_harvest_date || todayIso() : null,
       yield_in_kg: form.status === 'harvested' ? form.yield_in_kg : null,
     });
@@ -226,7 +231,7 @@ export default function CropCycles() {
                       </TableCell>
                       <TableCell>
                         {crop.status === 'harvested' && crop.yield_in_kg ? (
-                          <div>{crop.yield_in_kg} {t('crops.unitBunch')}</div>
+                          <div>{crop.yield_in_kg} {yieldUnitLabel(crop.yield_unit)}</div>
                         ) : '—'}
                       </TableCell>
                       <TableCell>{formatFCFA(crop.estimated_cost_fcfa)}</TableCell>
@@ -293,6 +298,17 @@ export default function CropCycles() {
                   <div className="grid grid-cols-2 gap-4">
                     <div><Label>{t('crops.actualHarvestDate')}</Label><Input type="date" value={form.actual_harvest_date} onChange={(e) => setForm({ ...form, actual_harvest_date: e.target.value })} /></div>
                     <div><Label>{t('crops.yieldKg')}</Label><Input type="number" min={0} placeholder={t('crops.yieldPlaceholder')} value={form.yield_in_kg} onChange={(e) => setForm({ ...form, yield_in_kg: parseInt(e.target.value) || 0 })} /></div>
+                  </div>
+                  <div>
+                    <Label>{t('crops.yieldUnit')}</Label>
+                    <Select value={form.yield_unit} onValueChange={(v) => setForm({ ...form, yield_unit: v })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {YIELD_UNITS.map((u) => (
+                          <SelectItem key={u} value={u}>{yieldUnitLabel(u)}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <p className="text-xs text-slate-500">{t('crops.yieldHint')}</p>
                 </div>

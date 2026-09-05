@@ -102,6 +102,7 @@ export interface CropCycle {
   expected_harvest_date: string;
   actual_harvest_date?: string | null;
   yield_in_kg?: number | null;
+  yield_unit?: string;
   status: 'planted' | 'growing' | 'harvested' | 'failed';
   estimated_cost_fcfa: number;
   revenue_fcfa?: number | null;
