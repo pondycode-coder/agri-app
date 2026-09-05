@@ -3,6 +3,7 @@ import {
   Profile,
   Plot,
   CropCycle,
+  Harvest,
   Contact,
   InventoryItem,
   Worker,
@@ -15,6 +16,7 @@ import {
   INITIAL_PROFILES,
   INITIAL_PLOTS,
   INITIAL_CROP_CYCLES,
+  INITIAL_HARVESTS,
   INITIAL_CONTACTS,
   INITIAL_INVENTORY,
   INITIAL_WORKERS,
@@ -95,6 +97,7 @@ class LocalDatabaseStore {
         this.upsertRemote<Farm>('farms', this.farms),
         this.upsertRemote<Plot>('plots', this.plots),
         this.upsertRemote<CropCycle>('crop_cycles', this.cropCycles),
+        this.upsertRemote<Harvest>('harvests', this.harvests),
         this.upsertRemote<Contact>('contacts', this.contacts),
         this.upsertRemote<InventoryItem>('inventory_items', this.inventory),
         this.upsertRemote<Worker>('workers', this.workers),
@@ -105,7 +108,7 @@ class LocalDatabaseStore {
       if (results.every(Boolean)) {
         this.setSyncError(null);
       } else {
-        const failed = ['farms','plots','crop_cycles','contacts','inventory_items','workers','farm_tasks','financial_records','investments']
+        const failed = ['farms','plots','crop_cycles','harvests','contacts','inventory_items','workers','farm_tasks','financial_records','investments']
           .filter((_, i) => !results[i]);
         this.setSyncError(`Échec de synchronisation: ${failed.join(', ')} — vérifiez votre connexion et les permissions.`);
       }
@@ -116,11 +119,12 @@ class LocalDatabaseStore {
   public async hydrateFromRemote(farmId: string) {
     if (!this.remote?.isConfigured()) return;
     this.remote.farmId = farmId;
-    const [farms, plots, cropCycles, contacts, inventory, workers, tasks, financials, investments] =
+    const [farms, plots, cropCycles, harvests, contacts, inventory, workers, tasks, financials, investments] =
       await Promise.all([
         this.remote.fetchAll<Farm>('farms'),
         this.remote.fetchAll<Plot>('plots'),
         this.remote.fetchAll<CropCycle>('crop_cycles'),
+        this.remote.fetchAll<Harvest>('harvests'),
         this.remote.fetchAll<Contact>('contacts'),
         this.remote.fetchAll<InventoryItem>('inventory_items'),
         this.remote.fetchAll<Worker>('workers'),
@@ -131,6 +135,7 @@ class LocalDatabaseStore {
     this.farms = farms;
     this.plots = plots;
     this.cropCycles = cropCycles;
+    this.harvests = harvests;
     this.contacts = contacts;
     this.inventory = inventory;
     this.workers = workers;
@@ -150,6 +155,7 @@ class LocalDatabaseStore {
   private profiles: Profile[] = [];
   private plots: Plot[] = [];
   private cropCycles: CropCycle[] = [];
+  private harvests: Harvest[] = [];
   private contacts: Contact[] = [];
   private inventory: InventoryItem[] = [];
   private workers: Worker[] = [];
@@ -183,6 +189,9 @@ class LocalDatabaseStore {
       const storedCrops = localStorage.getItem('agri_crop_cycles');
       this.cropCycles = storedCrops ? JSON.parse(storedCrops) : INITIAL_CROP_CYCLES;
 
+      const storedHarvests = localStorage.getItem('agri_harvests');
+      this.harvests = storedHarvests ? JSON.parse(storedHarvests) : INITIAL_HARVESTS;
+
       const storedContacts = localStorage.getItem('agri_contacts');
       this.contacts = storedContacts ? JSON.parse(storedContacts) : INITIAL_CONTACTS;
 
@@ -211,6 +220,7 @@ class LocalDatabaseStore {
     this.profiles = [...INITIAL_PROFILES];
     this.plots = [...INITIAL_PLOTS];
     this.cropCycles = [...INITIAL_CROP_CYCLES];
+    this.harvests = [...INITIAL_HARVESTS];
     this.contacts = [...INITIAL_CONTACTS];
     this.inventory = [...INITIAL_INVENTORY];
     this.workers = [...INITIAL_WORKERS];
@@ -225,6 +235,7 @@ class LocalDatabaseStore {
     localStorage.setItem('agri_profiles', JSON.stringify(this.profiles));
     localStorage.setItem('agri_plots', JSON.stringify(this.plots));
     localStorage.setItem('agri_crop_cycles', JSON.stringify(this.cropCycles));
+    localStorage.setItem('agri_harvests', JSON.stringify(this.harvests));
     localStorage.setItem('agri_contacts', JSON.stringify(this.contacts));
     localStorage.setItem('agri_inventory', JSON.stringify(this.inventory));
     localStorage.setItem('agri_workers', JSON.stringify(this.workers));
@@ -390,6 +401,42 @@ class LocalDatabaseStore {
     this.cropCycles = this.cropCycles.filter((c) => c.id !== id);
     this.saveAll();
     this.queueRemote(() => this.deleteRemote('crop_cycles', id));
+  }
+
+  // --- HARVESTS ---
+  public getHarvests(): Harvest[] { return [...this.harvests]; }
+  public getHarvestsByCycle(cycleId: string): Harvest[] {
+    return this.harvests
+      .filter((h) => h.crop_cycle_id === cycleId)
+      .sort((a, b) => (a.harvest_date < b.harvest_date ? -1 : a.harvest_date > b.harvest_date ? 1 : a.created_at < b.created_at ? -1 : 1));
+  }
+  public saveHarvest(harvestData: Partial<Harvest> & { id?: string; crop_cycle_id: string }): Harvest {
+    const now = new Date().toISOString();
+    if (harvestData.id) {
+      this.harvests = this.harvests.map((h) => (h.id === harvestData.id ? { ...h, ...harvestData, updated_at: now } : h));
+      this.saveAll();
+      return this.harvests.find((h) => h.id === harvestData.id)!;
+    } else {
+      const newHarvest: Harvest = {
+        id: crypto.randomUUID(),
+        crop_cycle_id: harvestData.crop_cycle_id,
+        harvest_date: harvestData.harvest_date || new Date().toISOString().split('T')[0],
+        quantity: harvestData.quantity || 0,
+        unit: harvestData.unit || 'bunch',
+        revenue_fcfa: harvestData.revenue_fcfa || 0,
+        notes: harvestData.notes || null,
+        created_at: now,
+        updated_at: now,
+      };
+      this.harvests.push(newHarvest);
+      this.saveAll();
+      return newHarvest;
+    }
+  }
+  public deleteHarvest(id: string) {
+    this.harvests = this.harvests.filter((h) => h.id !== id);
+    this.saveAll();
+    this.queueRemote(() => this.deleteRemote('harvests', id));
   }
 
   // --- CONTACTS ---

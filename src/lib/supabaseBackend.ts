@@ -6,6 +6,7 @@ export type EntityKey =
   | 'profiles'
   | 'plots'
   | 'crop_cycles'
+  | 'harvests'
   | 'contacts'
   | 'inventory_items'
   | 'workers'
@@ -42,13 +43,15 @@ export class SupabaseBackend {
       // - `farms`: primary key IS the farm id → filter by `id`.
       // - `crop_cycles`: has NO farm_id column; scoped via plot_id →
       //   plots.farm_id, so it must not be filtered on a nonexistent column.
+      // - `harvests`: has NO farm_id column; scoped via crop_cycle_id →
+      //   crop_cycles.plot_id → plots.farm_id (same reason).
       // - `contacts`/`investments`: farm_id is optional, so rows created
       //   with farm_id IS NULL are allowed by RLS (coalesce) and must be
       //   fetched back — otherwise they vanish after a reload.
       // - everything else: carries a farm_id column.
       if (table === 'farms') {
         q = q.eq('id', this.farmId);
-      } else if (table === 'crop_cycles') {
+      } else if (table === 'crop_cycles' || table === 'harvests') {
         // no farm_id column — RLS already scopes to the current farm
       } else if (table === 'contacts' || table === 'investments') {
         q = q.or(`farm_id.eq.${this.farmId},farm_id.is.null`);

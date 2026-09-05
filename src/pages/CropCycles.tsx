@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { MainLayout } from '@/components/MainLayout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,12 +8,12 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useI18n } from '@/context/I18nProvider';
 import { dbStore } from '@/services/store';
-import { CropCycle } from '@/types/database';
+import { CropCycle, Harvest } from '@/types/database';
 import { formatFCFA } from '@/types/database';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Sprout, Plus, Pencil, Trash2, Search, Timer, TrendingUp, LandPlot, Wallet } from 'lucide-react';
+import { Sprout, Plus, Pencil, Trash2, Search, Timer, TrendingUp, LandPlot, Wallet, ChevronRight, ChevronDown, StickyNote } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 const statusColors: Record<string, string> = {
@@ -23,30 +23,33 @@ const statusColors: Record<string, string> = {
   failed: 'bg-red-100 text-red-800',
 };
 
-const todayIso = () => new Date().toISOString().split('T')[0];
-
 const YIELD_UNITS = ['bunch', 'bag'] as const;
+const todayIso = () => new Date().toISOString().split('T')[0];
 
 export default function CropCycles() {
   const { t } = useI18n();
   const { toast } = useToast();
   const [crops, setCrops] = useState<CropCycle[]>([]);
   const [plots, setPlots] = useState<ReturnType<typeof dbStore.getPlots>>([]);
+  const [harvests, setHarvests] = useState<Harvest[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingCrop, setEditingCrop] = useState<CropCycle | null>(null);
   const [form, setForm] = useState({
     plot_id: '', crop_name: 'Cacao', variety: '', season: '', planting_date: '', expected_harvest_date: '',
-    actual_harvest_date: '', yield_in_kg: 0, yield_unit: 'bunch' as string,
-    status: 'planted' as CropCycle['status'], estimated_cost_fcfa: 0, revenue_fcfa: 0,
+    status: 'planted' as CropCycle['status'], estimated_cost_fcfa: 0,
   });
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'overdue' | CropCycle['status']>('all');
+  const [harvestDialog, setHarvestDialog] = useState<{ open: boolean; cycleId: string; cycleName: string }>({ open: false, cycleId: '', cycleName: '' });
+  const [harvestForm, setHarvestForm] = useState({ harvest_date: todayIso(), quantity: 0, unit: 'bunch' as string, revenue_fcfa: 0, notes: '' });
 
   useEffect(() => {
     const refresh = () => {
       setCrops(dbStore.getCropCycles());
       setPlots(dbStore.getPlots());
+      setHarvests(dbStore.getHarvests());
     };
     const unsub = dbStore.subscribe(refresh);
     refresh();
@@ -60,9 +63,31 @@ export default function CropCycles() {
     Boolean(c.expected_harvest_date) &&
     c.expected_harvest_date < todayIso();
 
+  const cycleHarvests = (cycleId: string) => harvests.filter((h) => h.crop_cycle_id === cycleId);
+
+  const totals = (c: CropCycle) => {
+    const hs = cycleHarvests(c.id);
+    const byUnit: Record<string, number> = { bunch: 0, bag: 0 };
+    for (const h of hs) byUnit[h.unit] = (byUnit[h.unit] || 0) + h.quantity;
+    if (hs.length > 0) {
+      return {
+        hasBatches: true,
+        revenue: hs.reduce((sum, h) => sum + h.revenue_fcfa, 0),
+        units: byUnit,
+        latestDate: hs.map((h) => h.harvest_date).sort().at(-1) || null,
+      };
+    }
+    return {
+      hasBatches: false,
+      revenue: c.revenue_fcfa || 0,
+      units: c.yield_in_kg ? { [c.yield_unit || 'bunch']: c.yield_in_kg } : {},
+      latestDate: c.actual_harvest_date || null,
+    };
+  };
+
   const yieldUnitLabel = (unit?: string) => (unit === 'bag' ? t('crops.unitBag') : t('crops.unitBunch'));
 
-  const margin = (c: CropCycle) => (c.revenue_fcfa || 0) - c.estimated_cost_fcfa;
+  const margin = (c: CropCycle) => totals(c).revenue - c.estimated_cost_fcfa;
 
   const filteredCrops = crops.filter((c) => {
     const q = search.trim().toLowerCase();
@@ -86,43 +111,65 @@ export default function CropCycles() {
     (sum, pid) => sum + (plotById(pid)?.size_in_hectares || 0),
     0,
   );
-  const harvestedCycles = crops.filter((c) => c.status === 'harvested');
-  const harvestValue = harvestedCycles.reduce((sum, c) => sum + (c.revenue_fcfa || 0), 0);
-  const avgMargin = harvestedCycles.length ? harvestedCycles.reduce((sum, c) => sum + margin(c), 0) / harvestedCycles.length : 0;
+  const revenueCycles = crops.filter((c) => c.status === 'harvested' || cycleHarvests(c.id).length > 0);
+  const harvestValue = revenueCycles.reduce((sum, c) => sum + totals(c).revenue, 0);
+  const avgMargin = revenueCycles.length ? revenueCycles.reduce((sum, c) => sum + margin(c), 0) / revenueCycles.length : 0;
 
   const openCreate = () => {
     setEditingCrop(null);
-    setForm({ plot_id: plots[0]?.id || '', crop_name: 'Cacao', variety: '', season: '', planting_date: todayIso(), expected_harvest_date: '', actual_harvest_date: '', yield_in_kg: 0, yield_unit: 'bunch', status: 'planted', estimated_cost_fcfa: 0, revenue_fcfa: 0 });
+    setForm({ plot_id: plots[0]?.id || '', crop_name: 'Cacao', variety: '', season: '', planting_date: todayIso(), expected_harvest_date: '', status: 'planted', estimated_cost_fcfa: 0 });
     setDialogOpen(true);
   };
 
   const openEdit = (crop: CropCycle) => {
     setEditingCrop(crop);
-    setForm({ plot_id: crop.plot_id, crop_name: crop.crop_name, variety: crop.variety, season: crop.season, planting_date: crop.planting_date, expected_harvest_date: crop.expected_harvest_date, actual_harvest_date: crop.actual_harvest_date || '', yield_in_kg: crop.yield_in_kg || 0, yield_unit: crop.yield_unit || 'bunch', status: crop.status, estimated_cost_fcfa: crop.estimated_cost_fcfa, revenue_fcfa: crop.revenue_fcfa || 0 });
+    setForm({ plot_id: crop.plot_id, crop_name: crop.crop_name, variety: crop.variety, season: crop.season, planting_date: crop.planting_date, expected_harvest_date: crop.expected_harvest_date, status: crop.status, estimated_cost_fcfa: crop.estimated_cost_fcfa });
     setDialogOpen(true);
   };
 
-  const openHarvest = (crop: CropCycle) => {
-    setEditingCrop(crop);
-    setForm({ plot_id: crop.plot_id, crop_name: crop.crop_name, variety: crop.variety, season: crop.season, planting_date: crop.planting_date, expected_harvest_date: crop.expected_harvest_date, actual_harvest_date: todayIso(), yield_in_kg: crop.yield_in_kg || 0, yield_unit: crop.yield_unit || 'bunch', status: 'harvested', estimated_cost_fcfa: crop.estimated_cost_fcfa, revenue_fcfa: crop.revenue_fcfa || 0 });
-    setDialogOpen(true);
+  const openHarvestDialog = (crop: CropCycle) => {
+    const last = cycleHarvests(crop.id).at(-1);
+    setHarvestForm({ harvest_date: todayIso(), quantity: 0, unit: last?.unit || crop.yield_unit || 'bunch', revenue_fcfa: 0, notes: '' });
+    setHarvestDialog({ open: true, cycleId: crop.id, cycleName: crop.crop_name });
   };
 
-  const handleSave = () => {
+  const handleSaveCycle = () => {
     if (!form.plot_id) return;
-    dbStore.saveCropCycle({
-      ...form,
-      id: editingCrop?.id,
-      yield_unit: form.yield_unit || 'bunch',
-      actual_harvest_date: form.status === 'harvested' ? form.actual_harvest_date || todayIso() : null,
-      yield_in_kg: form.status === 'harvested' ? form.yield_in_kg : null,
-    });
+    dbStore.saveCropCycle({ ...form, id: editingCrop?.id });
     setDialogOpen(false);
-    toast({ title: editingCrop && editingCrop.status !== 'harvested' && form.status === 'harvested' ? t('crops.harvestToast') : (editingCrop ? t('common.successUpdated') : t('common.successCreated')) });
+    toast({ title: editingCrop ? t('common.successUpdated') : t('common.successCreated') });
   };
 
-  const handleDelete = () => {
-    if (deleteId) { dbStore.deleteCropCycle(deleteId); setDeleteId(null); toast({ title: t('common.successDeleted') }); }
+  const handleSaveHarvest = () => {
+    if (!harvestDialog.cycleId) return;
+    dbStore.saveHarvest({
+      crop_cycle_id: harvestDialog.cycleId,
+      harvest_date: harvestForm.harvest_date || todayIso(),
+      quantity: harvestForm.quantity || 0,
+      unit: (harvestForm.unit === 'bag' ? 'bag' : 'bunch'),
+      revenue_fcfa: harvestForm.revenue_fcfa || 0,
+      notes: harvestForm.notes?.trim() || null,
+    });
+    const cyc = crops.find((c) => c.id === harvestDialog.cycleId);
+    if (cyc && (cyc.status === 'planted' || cyc.status === 'growing')) {
+      dbStore.saveCropCycle({ id: cyc.id, plot_id: cyc.plot_id, status: 'harvested' });
+    }
+    setHarvestDialog({ open: false, cycleId: '', cycleName: '' });
+    toast({ title: t('crops.harvestToast') });
+  };
+
+  const handleDeleteCycle = () => {
+    if (deleteId) {
+      cycleHarvests(deleteId).forEach((h) => dbStore.deleteHarvest(h.id));
+      dbStore.deleteCropCycle(deleteId);
+      setDeleteId(null);
+      toast({ title: t('common.successDeleted') });
+    }
+  };
+
+  const handleDeleteHarvest = (id: string) => {
+    dbStore.deleteHarvest(id);
+    toast({ title: t('common.successDeleted') });
   };
 
   const statusLabel = (s: string) => {
@@ -187,6 +234,7 @@ export default function CropCycles() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-10"></TableHead>
                   <TableHead>{t('crops.cropName')}</TableHead>
                   <TableHead>{t('crops.plot')}</TableHead>
                   <TableHead>{t('crops.plantingDate')}</TableHead>
@@ -199,61 +247,118 @@ export default function CropCycles() {
               </TableHeader>
               <TableBody>
                 {sortedCrops.length === 0 ? (
-                  <TableRow><TableCell colSpan={8} className="text-center py-8 text-slate-500">{t('common.noData')}</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={9} className="text-center py-8 text-slate-500">{t('common.noData')}</TableCell></TableRow>
                 ) : sortedCrops.map((crop) => {
+                  const ts = totals(crop);
+                  const unitsList = Object.entries(ts.units).filter(([, q]) => q > 0);
+                  const expanded = expandedId === crop.id;
                   return (
-                    <TableRow key={crop.id}>
-                      <TableCell>
-                        <div className="font-medium">{crop.crop_name}</div>
-                        <div className="text-xs text-slate-500">
-                          {[crop.variety, crop.season].filter(Boolean).join(' · ') || '—'}
-                        </div>
-                        <Badge className={`mt-1 ${statusColors[crop.status] || ''}`}>{statusLabel(crop.status)}</Badge>
-                      </TableCell>
-                      <TableCell>{plotById(crop.plot_id)?.name || '—'}</TableCell>
-                      <TableCell>{crop.planting_date}</TableCell>
-                      <TableCell>
-                        {crop.status === 'harvested' ? (
-                          <div>
-                            <div>{crop.actual_harvest_date || '—'}</div>
-                            <div className="text-xs text-emerald-600">{t('crops.harvestedOn')}</div>
+                    <Fragment key={crop.id}>
+                      <TableRow>
+                        <TableCell>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setExpandedId(expanded ? null : crop.id)}>
+                            {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                          </Button>
+                        </TableCell>
+                        <TableCell>
+                          <div className="font-medium">{crop.crop_name}</div>
+                          <div className="text-xs text-slate-500">
+                            {[crop.variety, crop.season].filter(Boolean).join(' · ') || '—'}
                           </div>
-                        ) : (
-                          <div className="space-y-1">
-                            <div>{crop.expected_harvest_date || '—'}</div>
-                            {isOverdue(crop) && (
-                              <Badge className="bg-red-100 text-red-700">
-                                <Timer className="h-3 w-3 mr-1" />{t('crops.overdue')}
-                              </Badge>
-                            )}
-                          </div>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {crop.status === 'harvested' && crop.yield_in_kg ? (
-                          <div>{crop.yield_in_kg} {yieldUnitLabel(crop.yield_unit)}</div>
-                        ) : '—'}
-                      </TableCell>
-                      <TableCell>{formatFCFA(crop.estimated_cost_fcfa)}</TableCell>
-                      <TableCell className="font-medium">{crop.revenue_fcfa ? formatFCFA(crop.revenue_fcfa) : '—'}</TableCell>
-                      <TableCell className="text-right space-x-1 whitespace-nowrap">
-                        {(crop.status === 'planted' || crop.status === 'growing') && (
-                          <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => openHarvest(crop)}>
+                          <Badge className={`mt-1 ${statusColors[crop.status] || ''}`}>{statusLabel(crop.status)}</Badge>
+                        </TableCell>
+                        <TableCell>{plotById(crop.plot_id)?.name || '—'}</TableCell>
+                        <TableCell>{crop.planting_date}</TableCell>
+                        <TableCell>
+                          {crop.status === 'harvested' ? (
+                            <div>
+                              <div>{ts.latestDate || '—'}</div>
+                              <div className="text-xs text-emerald-600">{t('crops.harvestedOn')}</div>
+                            </div>
+                          ) : (
+                            <div className="space-y-1">
+                              <div>{crop.expected_harvest_date || '—'}</div>
+                              {isOverdue(crop) && (
+                                <Badge className="bg-red-100 text-red-700">
+                                  <Timer className="h-3 w-3 mr-1" />{t('crops.overdue')}
+                                </Badge>
+                              )}
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {unitsList.length > 0 ? (
+                            <div>
+                              {unitsList.map(([unit, qty]) => (
+                                <div key={unit}>{qty} {yieldUnitLabel(unit)}</div>
+                              ))}
+                            </div>
+                          ) : '—'}
+                        </TableCell>
+                        <TableCell>{formatFCFA(crop.estimated_cost_fcfa)}</TableCell>
+                        <TableCell className="font-medium">{ts.revenue > 0 ? formatFCFA(ts.revenue) : '—'}</TableCell>
+                        <TableCell className="text-right space-x-1 whitespace-nowrap">
+                          <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => openHarvestDialog(crop)}>
                             <Sprout className="h-3.5 w-3.5 mr-1 text-emerald-600" />{t('crops.harvestBtn')}
                           </Button>
-                        )}
-                        <Button variant="ghost" size="icon" onClick={() => openEdit(crop)}><Pencil className="h-4 w-4" /></Button>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="icon" onClick={() => setDeleteId(crop.id)}><Trash2 className="h-4 w-4 text-red-500" /></Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader><AlertDialogTitle>{t('common.confirm')}</AlertDialogTitle><AlertDialogDescription>{t('common.areYouSure')}</AlertDialogDescription></AlertDialogHeader>
-                            <AlertDialogFooter><AlertDialogCancel onClick={() => setDeleteId(null)}>{t('common.cancel')}</AlertDialogCancel><AlertDialogAction onClick={handleDelete}>{t('common.delete')}</AlertDialogAction></AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </TableCell>
-                    </TableRow>
+                          <Button variant="ghost" size="icon" onClick={() => openEdit(crop)}><Pencil className="h-4 w-4" /></Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="ghost" size="icon" onClick={() => setDeleteId(crop.id)}><Trash2 className="h-4 w-4 text-red-500" /></Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader><AlertDialogTitle>{t('common.confirm')}</AlertDialogTitle><AlertDialogDescription>{t('common.areYouSure')}</AlertDialogDescription></AlertDialogHeader>
+                              <AlertDialogFooter><AlertDialogCancel onClick={() => setDeleteId(null)}>{t('common.cancel')}</AlertDialogCancel><AlertDialogAction onClick={handleDeleteCycle}>{t('common.delete')}</AlertDialogAction></AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </TableCell>
+                      </TableRow>
+                      {expanded && (
+                        <TableRow key={`${crop.id}-harvests`} className="bg-slate-50 dark:bg-slate-900/40">
+                          <TableCell colSpan={9}>
+                            <div className="p-3 space-y-2">
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm font-semibold">{t('crops.harvestsTitle')} ({cycleHarvests(crop.id).length})</span>
+                                <Button variant="outline" size="sm" onClick={() => openHarvestDialog(crop)}>
+                                  <Plus className="h-3.5 w-3.5 mr-1" />{t('crops.addHarvest')}
+                                </Button>
+                              </div>
+                              {cycleHarvests(crop.id).length === 0 ? (
+                                <p className="text-sm text-slate-500">{t('crops.noHarvests')}</p>
+                              ) : (
+                                <div className="divide-y divide-slate-200 dark:divide-slate-700">
+                                  {cycleHarvests(crop.id).map((h) => (
+                                    <div key={h.id} className="flex items-center justify-between gap-3 py-2 text-sm">
+                                      <div>
+                                        <div className="font-medium">{h.harvest_date}</div>
+                                        {h.notes && (
+                                          <div className="text-xs text-slate-500 flex items-center gap-1">
+                                            <StickyNote className="h-3 w-3" />{h.notes}
+                                          </div>
+                                        )}
+                                      </div>
+                                      <div className="flex items-center gap-3 whitespace-nowrap">
+                                        <span>{h.quantity} {yieldUnitLabel(h.unit)}</span>
+                                        <span className="font-medium">{formatFCFA(h.revenue_fcfa)}</span>
+                                        <AlertDialog>
+                                          <AlertDialogTrigger asChild>
+                                            <Button variant="ghost" size="icon" className="h-7 w-7"><Trash2 className="h-3.5 w-3.5 text-red-500" /></Button>
+                                          </AlertDialogTrigger>
+                                          <AlertDialogContent>
+                                            <AlertDialogHeader><AlertDialogTitle>{t('common.confirm')}</AlertDialogTitle><AlertDialogDescription>{t('crops.harvestDelete')}</AlertDialogDescription></AlertDialogHeader>
+                                            <AlertDialogFooter><AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteHarvest(h.id)}>{t('common.delete')}</AlertDialogAction></AlertDialogFooter>
+                                          </AlertDialogContent>
+                                        </AlertDialog>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </Fragment>
                   );
                 })}
               </TableBody>
@@ -290,38 +395,53 @@ export default function CropCycles() {
                 <div><Label>{t('crops.harvestDate')}</Label><Input type="date" value={form.expected_harvest_date} onChange={(e) => setForm({ ...form, expected_harvest_date: e.target.value })} /></div>
               </div>
               <p className="text-xs text-slate-500">{t('crops.expectedHarvestHint')}</p>
-              {form.status === 'harvested' && (
-                <div className="rounded-lg border bg-slate-50 dark:bg-slate-900/40 p-3 space-y-3">
-                  <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">
-                    <Sprout className="h-4 w-4 inline mr-1" />{t('crops.harvestBoxTitle')}
-                  </p>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div><Label>{t('crops.actualHarvestDate')}</Label><Input type="date" value={form.actual_harvest_date} onChange={(e) => setForm({ ...form, actual_harvest_date: e.target.value })} /></div>
-                    <div><Label>{t('crops.yieldKg')}</Label><Input type="number" min={0} placeholder={t('crops.yieldPlaceholder')} value={form.yield_in_kg} onChange={(e) => setForm({ ...form, yield_in_kg: parseInt(e.target.value) || 0 })} /></div>
-                  </div>
-                  <div>
-                    <Label>{t('crops.yieldUnit')}</Label>
-                    <Select value={form.yield_unit} onValueChange={(v) => setForm({ ...form, yield_unit: v })}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {YIELD_UNITS.map((u) => (
-                          <SelectItem key={u} value={u}>{yieldUnitLabel(u)}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <p className="text-xs text-slate-500">{t('crops.yieldHint')}</p>
-                </div>
-              )}
               <div className="grid grid-cols-2 gap-4">
                 <div><Label>{t('crops.costFcfa')}</Label><Input type="number" min={0} placeholder={t('crops.costPlaceholder')} value={form.estimated_cost_fcfa} onChange={(e) => setForm({ ...form, estimated_cost_fcfa: parseInt(e.target.value) || 0 })} /></div>
-                <div><Label>{t('crops.revenueFcfa')}</Label><Input type="number" min={0} placeholder={t('crops.revenuePlaceholder')} value={form.revenue_fcfa} onChange={(e) => setForm({ ...form, revenue_fcfa: parseInt(e.target.value) || 0 })} /></div>
               </div>
-              <p className="text-xs text-slate-500">{t('crops.revenueHint')}</p>
+              <p className="text-xs text-slate-500">{t('crops.revenueViaHarvests')}</p>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setDialogOpen(false)}>{t('common.cancel')}</Button>
-              <Button onClick={handleSave} className="bg-emerald-600 hover:bg-emerald-700">{t('common.save')}</Button>
+              <Button onClick={handleSaveCycle} className="bg-emerald-600 hover:bg-emerald-700">{t('common.save')}</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={harvestDialog.open} onOpenChange={(o) => setHarvestDialog({ ...harvestDialog, open: o })}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Sprout className="h-5 w-5 text-emerald-600" />{t('crops.addHarvest')} — {harvestDialog.cycleName}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div><Label>{t('crops.harvestDateField')}</Label><Input type="date" value={harvestForm.harvest_date} onChange={(e) => setHarvestForm({ ...harvestForm, harvest_date: e.target.value })} /></div>
+                <div><Label>{t('crops.yieldKg')}</Label><Input type="number" min={0} placeholder={t('crops.yieldPlaceholder')} value={harvestForm.quantity} onChange={(e) => setHarvestForm({ ...harvestForm, quantity: parseInt(e.target.value) || 0 })} /></div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>{t('crops.yieldUnit')}</Label>
+                  <Select value={harvestForm.unit} onValueChange={(v) => setHarvestForm({ ...harvestForm, unit: v })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {YIELD_UNITS.map((u) => (
+                        <SelectItem key={u} value={u}>{yieldUnitLabel(u)}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div><Label>{t('crops.revenueFcfa')}</Label><Input type="number" min={0} placeholder={t('crops.revenuePlaceholder')} value={harvestForm.revenue_fcfa} onChange={(e) => setHarvestForm({ ...harvestForm, revenue_fcfa: parseInt(e.target.value) || 0 })} /></div>
+              </div>
+              <div>
+                <Label>{t('crops.harvestNotes')}</Label>
+                <Input value={harvestForm.notes} onChange={(e) => setHarvestForm({ ...harvestForm, notes: e.target.value })} />
+              </div>
+              <p className="text-xs text-slate-500">{t('crops.yieldHint')}</p>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setHarvestDialog({ ...harvestDialog, open: false })}>{t('common.cancel')}</Button>
+              <Button onClick={handleSaveHarvest} className="bg-emerald-600 hover:bg-emerald-700">{t('common.save')}</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

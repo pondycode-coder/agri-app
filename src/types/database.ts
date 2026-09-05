@@ -110,6 +110,18 @@ export interface CropCycle {
   updated_at: string;
 }
 
+export interface Harvest {
+  id: string;
+  crop_cycle_id: string;
+  harvest_date: string;
+  quantity: number;
+  unit: 'bunch' | 'bag';
+  revenue_fcfa: number;
+  notes?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Contact {
   id: string;
   name: string;
