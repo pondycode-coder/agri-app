@@ -70,8 +70,8 @@ export const MainLayout = ({ children }: { children: React.ReactNode }) => {
     { path: '/dashboard/financials', label: t('layout.sidebar.financials'), icon: Receipt, resource: 'financials' as const },
     { path: '/dashboard/contacts', label: t('layout.sidebar.contacts'), icon: BookUser, resource: 'contacts' as const },
     { path: '/dashboard/investments', label: t('layout.sidebar.investments'), icon: TrendingUp, resource: 'investments' as const },
-    { path: '/dashboard/profile', label: t('layout.sidebar.profile'), icon: UserCircle, resource: 'profile' as const },
     { path: '/dashboard/help', label: t('layout.sidebar.help'), icon: CircleHelp, resource: 'dashboard' as const },
+    { path: '/dashboard/profile', label: t('layout.sidebar.profile'), icon: UserCircle, resource: 'profile' as const },
     ...(isSuperAdmin
       ? [{ path: '/dashboard/saas-admin', label: 'SaaS Admin', icon: ServerCog, resource: 'saas-admin' as const }]
       : []),
