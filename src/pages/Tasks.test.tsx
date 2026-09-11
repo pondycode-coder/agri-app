@@ -63,7 +63,7 @@ function renderTasks() {
 describe("Tasks page", () => {
   it("renders task table columns including wage amount and paid status", () => {
     renderTasks();
-    expect(screen.getByText(/Montant Salaire \(FCFA\)/i)).toBeInTheDocument();
+    expect(screen.getByText(/Montant Salaire \(F\)/i)).toBeInTheDocument();
     expect(screen.getAllByText(/Payé/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Non Payé/i).length).toBeGreaterThan(0);
   });

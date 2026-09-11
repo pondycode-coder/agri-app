@@ -149,7 +149,7 @@ export const MainLayout = ({ children }: { children: React.ReactNode }) => {
             Agri<span className="text-emerald-600">App</span>
           </span>
           <span className="text-xs bg-slate-100 text-slate-700 font-semibold px-1.5 py-0.5 rounded border border-slate-200">
-            XAF
+            F
           </span>
         </div>
         <Button
@@ -319,7 +319,7 @@ export const MainLayout = ({ children }: { children: React.ReactNode }) => {
         <header className="hidden md:flex h-16 items-center justify-between bg-white dark:bg-slate-900 border-b px-8 shadow-sm">
           <div className="flex items-center space-x-3">
             <Badge variant="outline" className="border-emerald-600/30 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 font-semibold px-2.5 py-1">
-              XAF / FCFA
+              F
             </Badge>
             <span className="text-slate-400 text-sm">|</span>
             <Badge variant="outline" className="border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-medium px-2.5 py-1">

@@ -120,7 +120,7 @@ export default function Dashboard() {
           <div className="relative z-10 space-y-2">
             <div className="flex items-center space-x-2">
               <Badge className="bg-yellow-400 text-slate-900 font-extrabold hover:bg-yellow-300">
-                XAF / FCFA
+                F
               </Badge>
               <span className="text-xs text-emerald-200">Système de Gestion Agricole</span>
             </div>

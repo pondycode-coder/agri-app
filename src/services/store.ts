@@ -8,6 +8,7 @@ import {
   InventoryItem,
   Worker,
   FarmTask,
+  TaskAdvanceBatch,
   FinancialRecord,
   Investment,
 } from '../types/database';
@@ -569,23 +570,64 @@ class LocalDatabaseStore {
         ? Object.values(workerWages).reduce((sum, v) => sum + (Number(v) || 0), 0)
         : typeof taskData.wage_amount === 'number' ? taskData.wage_amount : previousTask?.wage_amount ?? 0;
 
-    // Per-worker advances: use the incoming map (falling back to the stored one),
-    // pruned to workers still assigned to the task.
-    const workerAdvances =
-      taskData.worker_advances && Object.keys(taskData.worker_advances).length > 0
-        ? { ...taskData.worker_advances }
-        : previousTask?.worker_advances && Object.keys(previousTask.worker_advances).length > 0
-          ? { ...previousTask.worker_advances }
-          : undefined;
-    if (workerAdvances) {
-      for (const wid of Object.keys(workerAdvances)) {
-        if (!assignedWorkerIds.includes(wid)) delete workerAdvances[wid];
+    // Per-worker advances, modelled as dated batches (advance_batches). A single
+    // legacy batch is derived from the flat worker_advances / advance_amount
+    // fields when no batch data is provided, keeping backward compatibility.
+    let advanceBatches: TaskAdvanceBatch[] | undefined;
+    let hadAdvanceData = false;
+    if (Array.isArray(taskData.advance_batches)) {
+      hadAdvanceData = true;
+      if (taskData.advance_batches.length > 0) {
+        advanceBatches = taskData.advance_batches.map((b) => ({ ...b, amounts: { ...b.amounts } }));
       }
+    } else if (taskData.worker_advances && Object.keys(taskData.worker_advances).length > 0) {
+      hadAdvanceData = true;
+      advanceBatches = [
+        {
+          id: 'legacy-' + crypto.randomUUID(),
+          date: taskData.assigned_date || previousTask?.assigned_date || new Date().toISOString().split('T')[0],
+          amounts: { ...taskData.worker_advances },
+        },
+      ];
+    } else if (previousTask?.advance_batches && previousTask.advance_batches.length > 0) {
+      hadAdvanceData = true;
+      advanceBatches = previousTask.advance_batches.map((b) => ({ ...b, amounts: { ...b.amounts } }));
+    } else if (previousTask?.worker_advances && Object.keys(previousTask.worker_advances).length > 0) {
+      hadAdvanceData = true;
+      advanceBatches = [
+        {
+          id: 'legacy-' + previousTask.id,
+          date: previousTask.assigned_date || new Date().toISOString().split('T')[0],
+          amounts: { ...previousTask.worker_advances },
+        },
+      ];
     }
-    const advanceAmount =
-      workerAdvances && Object.keys(workerAdvances).length > 0
-        ? Object.values(workerAdvances).reduce((sum, v) => sum + (Number(v) || 0), 0)
-        : typeof taskData.advance_amount === 'number' ? taskData.advance_amount : previousTask?.advance_amount ?? 0;
+    // Prune removed workers and drop empty batches.
+    if (advanceBatches) {
+      advanceBatches = advanceBatches
+        .map((b) => {
+          const amounts: Record<string, number> = {};
+          for (const wid of Object.keys(b.amounts)) {
+            if (assignedWorkerIds.includes(wid)) amounts[wid] = Number(b.amounts[wid]) || 0;
+          }
+          return { ...b, amounts };
+        })
+        .filter((b) => Object.values(b.amounts).reduce((s, v) => s + v, 0) > 0);
+      if (advanceBatches.length === 0) advanceBatches = undefined;
+    }
+    let workerAdvances: Record<string, number> | undefined;
+    let advanceAmount: number;
+    if (hadAdvanceData && advanceBatches) {
+      workerAdvances = Object.fromEntries(
+        assignedWorkerIds.map((wid) => [wid, advanceBatches!.reduce((s, b) => s + (Number(b.amounts[wid]) || 0), 0)])
+      );
+      advanceAmount = advanceBatches.reduce((s, b) => s + Object.values(b.amounts).reduce((a, v) => a + v, 0), 0);
+    } else if (hadAdvanceData) {
+      // Data was provided but fully zeroed out.
+      advanceAmount = 0;
+    } else {
+      advanceAmount = typeof taskData.advance_amount === 'number' ? taskData.advance_amount : previousTask?.advance_amount ?? 0;
+    }
     const netWageAmount = Math.max(0, wageAmount - advanceAmount);
     const wagePaid = typeof taskData.wage_paid === 'boolean' ? taskData.wage_paid : previousTask?.wage_paid ?? false;
     let savedTask: FarmTask;
@@ -601,6 +643,7 @@ class LocalDatabaseStore {
               worker_wages: workerWages,
               worker_advances: workerAdvances,
               advance_amount: advanceAmount,
+              advance_batches: advanceBatches,
               wage_amount: wageAmount,
               wage_paid: wagePaid,
               updated_at: now,
@@ -620,6 +663,7 @@ class LocalDatabaseStore {
         worker_wages: workerWages,
         worker_advances: workerAdvances,
         advance_amount: advanceAmount,
+        advance_batches: advanceBatches,
         wage_amount: wageAmount,
         wage_paid: wagePaid,
         status: taskData.status || 'pending',
@@ -635,6 +679,9 @@ class LocalDatabaseStore {
     }
 
     // Advance given up front is cash already out — record it as its own expense.
+    const advanceDate = advanceBatches && advanceBatches.length > 0
+      ? [...advanceBatches].sort((a, b) => b.date.localeCompare(a.date))[0].date
+      : savedTask.completed_date || savedTask.due_date || new Date().toISOString().split('T')[0];
     const existingAdvance = this.financials.find((f) => f.task_id === savedTask.id && f.category === 'Avance Salaire');
     if (savedTask.status !== 'cancelled' && advanceAmount > 0) {
       if (existingAdvance) {
@@ -644,7 +691,7 @@ class LocalDatabaseStore {
                 ...f,
                 amount: advanceAmount,
                 worker_id: assignedWorkerIds[0] || null,
-                date: savedTask.completed_date || savedTask.due_date || new Date().toISOString().split('T')[0],
+                date: advanceDate,
                 updated_at: now,
               }
             : f
@@ -655,7 +702,7 @@ class LocalDatabaseStore {
           type: 'expense',
           amount: advanceAmount,
           currency: 'XAF',
-          date: savedTask.completed_date || savedTask.due_date || new Date().toISOString().split('T')[0],
+          date: advanceDate,
           description: 'Avance sur salaire versée aux ouvriers',
           category: 'Avance Salaire',
           farm_id: savedTask.farm_id,

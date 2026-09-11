@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { MainLayout } from '@/components/MainLayout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,11 +11,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuCheckboxItem, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { useI18n } from '@/context/I18nProvider';
 import { dbStore } from '@/services/store';
-import { FarmTask } from '@/types/database';
+import { FarmTask, TaskAdvanceBatch } from '@/types/database';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { CheckSquare, Plus, Pencil, Trash2, ChevronDown, Search } from 'lucide-react';
+import { CheckSquare, Plus, Pencil, Trash2, ChevronDown, Search, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { formatFCFA } from '@/types/database';
 
@@ -37,12 +37,13 @@ export default function Tasks() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<FarmTask | null>(null);
   const [form, setForm] = useState({
-    farm_id: '', title: '', description: '', worker_ids: [] as string[], worker_wages: {} as Record<string, number>, worker_advances: {} as Record<string, number>, plot_id: '',
+    farm_id: '', title: '', description: '', worker_ids: [] as string[], worker_wages: {} as Record<string, number>, advance_batches: [] as TaskAdvanceBatch[], plot_id: '',
     wage_amount: 0, wage_paid: false,
     status: 'pending' as FarmTask['status'], assigned_date: new Date().toISOString().split('T')[0],
     due_date: '',
   });
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | FarmTask['status']>('all');
 
@@ -65,8 +66,24 @@ export default function Tasks() {
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ farm_id: farms[0]?.id || '', title: '', description: '', worker_ids: [], worker_wages: {}, worker_advances: {}, plot_id: '', wage_amount: 0, wage_paid: false, status: 'pending', assigned_date: new Date().toISOString().split('T')[0], due_date: '' });
+    setForm({ farm_id: farms[0]?.id || '', title: '', description: '', worker_ids: [], worker_wages: {}, advance_batches: [], plot_id: '', wage_amount: 0, wage_paid: false, status: 'pending', assigned_date: new Date().toISOString().split('T')[0], due_date: '' });
     setDialogOpen(true);
+  };
+
+  const workerAdvanceBatches = (task: FarmTask): TaskAdvanceBatch[] => {
+    const workerIds = task.worker_ids?.length ? task.worker_ids : task.worker_id ? [task.worker_id] : [];
+    if (task.advance_batches && task.advance_batches.length > 0) {
+      return task.advance_batches.map((b) => ({ ...b, amounts: { ...b.amounts } }));
+    }
+    const amts: Record<string, number> =
+      task.worker_advances && Object.keys(task.worker_advances).length > 0
+        ? { ...task.worker_advances }
+        : workerIds.length
+          ? Object.fromEntries(workerIds.map((id) => [id, Math.round((task.advance_amount ?? 0) / workerIds.length)]))
+          : {};
+    const total = Object.values(amts).reduce((s, v) => s + (Number(v) || 0), 0);
+    if (total <= 0) return [];
+    return [{ id: 'legacy-' + task.id, date: task.assigned_date || '', amounts: amts }];
   };
 
   const openEdit = (task: FarmTask) => {
@@ -77,12 +94,6 @@ export default function Tasks() {
         : workerIds.length
           ? Object.fromEntries(workerIds.map((id) => [id, Math.round((task.wage_amount ?? 0) / workerIds.length)]))
           : {};
-    const workerAdvances =
-      task.worker_advances && Object.keys(task.worker_advances).length > 0
-        ? { ...task.worker_advances }
-        : workerIds.length
-          ? Object.fromEntries(workerIds.map((id) => [id, Math.round((task.advance_amount ?? 0) / workerIds.length)]))
-          : {};
     setEditing(task);
     setForm({
       farm_id: task.farm_id,
@@ -90,7 +101,7 @@ export default function Tasks() {
       description: task.description || '',
       worker_ids: workerIds,
       worker_wages: workerWages,
-      worker_advances: workerAdvances,
+      advance_batches: workerAdvanceBatches(task),
       plot_id: task.plot_id || '',
       wage_amount: task.wage_amount ?? 0,
       wage_paid: task.wage_paid ?? false,
@@ -105,16 +116,53 @@ export default function Tasks() {
     setForm((prev) => {
       const included = prev.worker_ids.includes(workerId);
       const worker_wages = { ...prev.worker_wages };
-      const worker_advances = { ...prev.worker_advances };
+      let advance_batches = prev.advance_batches.map((b) => ({ ...b, amounts: { ...b.amounts } }));
       if (included) {
         delete worker_wages[workerId];
-        delete worker_advances[workerId];
-        return { ...prev, worker_ids: prev.worker_ids.filter((id) => id !== workerId), worker_wages, worker_advances };
+        advance_batches = advance_batches
+          .map((b) => {
+            const amounts = { ...b.amounts };
+            delete amounts[workerId];
+            return { ...b, amounts };
+          })
+          .filter((b) => Object.keys(b.amounts).length > 0);
+        return { ...prev, worker_ids: prev.worker_ids.filter((id) => id !== workerId), worker_wages, advance_batches };
       }
       worker_wages[workerId] = 0;
-      worker_advances[workerId] = 0;
-      return { ...prev, worker_ids: [...prev.worker_ids, workerId], worker_wages, worker_advances };
+      if (advance_batches.length === 0) {
+        advance_batches = [
+          { id: crypto.randomUUID(), date: prev.assigned_date || new Date().toISOString().split('T')[0], amounts: { [workerId]: 0 } },
+        ];
+      } else {
+        advance_batches = advance_batches.map((b) => ({ ...b, amounts: { ...b.amounts, [workerId]: 0 } }));
+      }
+      return { ...prev, worker_ids: [...prev.worker_ids, workerId], worker_wages, advance_batches };
     });
+  };
+
+  const batchAmountSum = (b: TaskAdvanceBatch) => Object.values(b.amounts).reduce((s, v) => s + (Number(v) || 0), 0);
+  const addAdvanceBatch = () => {
+    setForm((prev) => ({
+      ...prev,
+      advance_batches: [
+        ...prev.advance_batches,
+        { id: crypto.randomUUID(), date: new Date().toISOString().split('T')[0], amounts: Object.fromEntries(prev.worker_ids.map((wid) => [wid, 0])) },
+      ],
+    }));
+  };
+  const updateAdvanceBatch = (bi: number, patch: Partial<TaskAdvanceBatch>) => {
+    setForm((prev) => ({ ...prev, advance_batches: prev.advance_batches.map((b, i) => (i === bi ? { ...b, ...patch } : b)) }));
+  };
+  const updateAdvanceBatchAmount = (bi: number, wid: string, value: number) => {
+    setForm((prev) => ({ ...prev, advance_batches: prev.advance_batches.map((b, i) => (i === bi ? { ...b, amounts: { ...b.amounts, [wid]: value } } : b)) }));
+  };
+  const removeAdvanceBatch = (bi: number) => {
+    setForm((prev) => ({ ...prev, advance_batches: prev.advance_batches.filter((_, i) => i !== bi) }));
+  };
+  const getWorkerName = (id?: string | null) => (id ? workers.find((w) => w.id === id)?.name || id : '—');
+  const getAdvanceBatches = (task: FarmTask): TaskAdvanceBatch[] => {
+    if (task.advance_batches && task.advance_batches.length > 0) return task.advance_batches;
+    return workerAdvanceBatches(task);
   };
 
   const handleSave = () => {
@@ -147,7 +195,7 @@ export default function Tasks() {
   };
 
   const totalWages = Object.values(form.worker_wages).reduce((s, v) => s + (Number(v) || 0), 0);
-  const totalAdvances = Object.values(form.worker_advances).reduce((s, v) => s + (Number(v) || 0), 0);
+  const totalAdvances = form.advance_batches.reduce((s, b) => s + Object.values(b.amounts).reduce((a, v) => a + (Number(v) || 0), 0), 0);
 
   const filteredTasks = tasks
     .filter((task) => {
@@ -197,6 +245,7 @@ export default function Tasks() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-8" />
                   <TableHead>{t('tasks.taskTitle')}</TableHead>
                   <TableHead>{t('tasks.assignedWorker')}</TableHead>
                   <TableHead>{t('tasks.assignedPlot')}</TableHead>
@@ -210,47 +259,89 @@ export default function Tasks() {
               </TableHeader>
               <TableBody>
                 {filteredTasks.length === 0 ? (
-                  <TableRow><TableCell colSpan={9} className="text-center py-8 text-slate-500">{t('common.noData')}</TableCell></TableRow>
-                ) : filteredTasks.map((task) => (
-                  <TableRow key={task.id}>
-                    <TableCell className="font-medium">{task.title}</TableCell>
-                    <TableCell>
-                      {getWorkerWageBreakdown(task).length === 0 ? (
-                        <span className="text-slate-400">—</span>
-                      ) : (
-                        <div className="space-y-0.5">
-                          {getWorkerWageBreakdown(task).map(({ id, name, wage, advance }) => (
-                            <div key={id} className="flex items-center justify-between gap-3 text-sm">
-                              <span>{name}</span>
-                              <span className="flex items-center gap-2 text-slate-500">
-                                {advance > 0 && <span className="text-amber-600">(-{formatFCFA(advance)})</span>}
-                                <span>{formatFCFA(wage)}</span>
-                              </span>
+                  <TableRow><TableCell colSpan={10} className="text-center py-8 text-slate-500">{t('common.noData')}</TableCell></TableRow>
+                ) : filteredTasks.map((task) => {
+                  const batches = getAdvanceBatches(task);
+                  const isExpanded = expandedTaskId === task.id;
+                  return (
+                    <Fragment key={task.id}>
+                      <TableRow className="cursor-pointer" onClick={() => setExpandedTaskId(isExpanded ? null : task.id)}>
+                        <TableCell className="w-8">
+                          <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${isExpanded ? '' : '-rotate-90'}`} />
+                        </TableCell>
+                        <TableCell className="font-medium">{task.title}</TableCell>
+                        <TableCell>
+                          {getWorkerWageBreakdown(task).length === 0 ? (
+                            <span className="text-slate-400">—</span>
+                          ) : (
+                            <div className="space-y-0.5">
+                              {getWorkerWageBreakdown(task).map(({ id, name, wage, advance }) => (
+                                <div key={id} className="flex items-center justify-between gap-3 text-sm">
+                                  <span>{name}</span>
+                                  <span className="flex items-center gap-2 text-slate-500">
+                                    {advance > 0 && <span className="text-amber-600">(-{formatFCFA(advance)})</span>}
+                                    <span>{formatFCFA(wage)}</span>
+                                  </span>
+                                </div>
+                              ))}
                             </div>
-                          ))}
-                        </div>
+                          )}
+                        </TableCell>
+                        <TableCell>{getPlotName(task.plot_id)}</TableCell>
+                        <TableCell>{task.due_date}</TableCell>
+                        <TableCell><Badge className={statusColors[task.status] || ''}>{statusLabel(task.status)}</Badge></TableCell>
+                        <TableCell>{formatFCFA(task.wage_amount ?? 0)}</TableCell>
+                        <TableCell>{formatFCFA(task.advance_amount ?? 0)}</TableCell>
+                        <TableCell><Badge className={task.wage_paid ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}>{task.wage_paid ? t('tasks.paid') : t('tasks.unpaid')}</Badge></TableCell>
+                        <TableCell className="text-right space-x-2">
+                          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); openEdit(task); }}><Pencil className="h-4 w-4" /></Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setDeleteId(task.id); }}><Trash2 className="h-4 w-4 text-red-500" /></Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader><AlertDialogTitle>{t('common.confirm')}</AlertDialogTitle><AlertDialogDescription>{t('common.areYouSure')}</AlertDialogDescription></AlertDialogHeader>
+                              <AlertDialogFooter><AlertDialogCancel onClick={() => setDeleteId(null)}>{t('common.cancel')}</AlertDialogCancel><AlertDialogAction onClick={handleDelete}>{t('common.delete')}</AlertDialogAction></AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </TableCell>
+                      </TableRow>
+                      {isExpanded && (
+                        <TableRow>
+                          <TableCell className="py-1" />
+                          <TableCell colSpan={9} className="py-1 bg-slate-50/70">
+                            <div className="py-2 space-y-2">
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm font-semibold text-slate-700">{t('tasks.advances')}</span>
+                                <span className="text-xs text-slate-500">{t('tasks.totalAdvance')} : {formatFCFA(task.advance_amount ?? 0)}</span>
+                              </div>
+                              {batches.length === 0 ? (
+                                <p className="text-sm text-slate-400">{t('tasks.noAdvances')}</p>
+                              ) : (
+                                <div className="grid gap-2 sm:grid-cols-2">
+                                  {batches.map((b) => (
+                                    <div key={b.id} className="rounded-md border border-slate-200 bg-white p-2">
+                                      <div className="flex items-center justify-between mb-1">
+                                        <span className="text-xs font-semibold text-slate-500">{t('tasks.advanceBatch')} #{batches.findIndex((x) => x.id === b.id) + 1}</span>
+                                        <span className="text-xs text-slate-500">{b.date || '—'}</span>
+                                      </div>
+                                      {Object.entries(b.amounts).map(([wid, amt]) => (
+                                        <div key={wid} className="flex items-center justify-between text-sm">
+                                          <span className="text-slate-700">{getWorkerName(wid)}</span>
+                                          <span className="text-amber-600 font-medium">{formatFCFA(Number(amt) || 0)}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
                       )}
-                    </TableCell>
-                    <TableCell>{getPlotName(task.plot_id)}</TableCell>
-                    <TableCell>{task.due_date}</TableCell>
-                    <TableCell><Badge className={statusColors[task.status] || ''}>{statusLabel(task.status)}</Badge></TableCell>
-                    <TableCell>{formatFCFA(task.wage_amount ?? 0)}</TableCell>
-                    <TableCell>{formatFCFA(task.advance_amount ?? 0)}</TableCell>
-                    <TableCell><Badge className={task.wage_paid ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}>{task.wage_paid ? t('tasks.paid') : t('tasks.unpaid')}</Badge></TableCell>
-                    <TableCell className="text-right space-x-2">
-                      <Button variant="ghost" size="icon" onClick={() => openEdit(task)}><Pencil className="h-4 w-4" /></Button>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="ghost" size="icon" onClick={() => setDeleteId(task.id)}><Trash2 className="h-4 w-4 text-red-500" /></Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader><AlertDialogTitle>{t('common.confirm')}</AlertDialogTitle><AlertDialogDescription>{t('common.areYouSure')}</AlertDialogDescription></AlertDialogHeader>
-                          <AlertDialogFooter><AlertDialogCancel onClick={() => setDeleteId(null)}>{t('common.cancel')}</AlertDialogCancel><AlertDialogAction onClick={handleDelete}>{t('common.delete')}</AlertDialogAction></AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                    </Fragment>
+                  );
+                })}
               </TableBody>
             </Table>
           </CardContent>
@@ -307,31 +398,17 @@ export default function Tasks() {
               </div>
               {form.worker_ids.length > 0 && (
                 <div>
-                  <Label>Salaires par ouvrier (FCFA)</Label>
+                  <Label>Salaires par ouvrier (F)</Label>
                   <div className="grid gap-2 rounded-md border border-slate-200 bg-slate-50 p-3">
-                    <div className="grid grid-cols-[1fr_110px_110px] items-center gap-2 text-xs font-medium text-slate-500">
+                    <div className="grid grid-cols-[1fr_150px] items-center gap-2 text-xs font-medium text-slate-500">
                       <span>Ouvrier</span>
-                      <span>{t('tasks.advance')} / {t('tasks.wageAmount')}</span>
+                      <span>{t('tasks.wageAmount')}</span>
                     </div>
                     {form.worker_ids.map((id) => (
-                      <div key={id} className="grid grid-cols-[1fr_110px_110px] items-center gap-2">
+                      <div key={id} className="grid grid-cols-[1fr_150px] items-center gap-2">
                         <span className="text-sm text-slate-700">
                           {workers.find((w) => w.id === id)?.name || '—'}
                         </span>
-                        <Input
-                          type="number"
-                          min={0}
-                          placeholder="Avance"
-                          title={t('tasks.advance')}
-                          value={form.worker_advances[id] ?? 0}
-                          onChange={(e) =>
-                            setForm((prev) => ({
-                              ...prev,
-                              worker_advances: { ...prev.worker_advances, [id]: Number(e.target.value) },
-                            }))
-                          }
-                          className="h-8"
-                        />
                         <Input
                           type="number"
                           min={0}
@@ -348,6 +425,56 @@ export default function Tasks() {
                         />
                       </div>
                     ))}
+                    <div className="mt-1">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-sm font-medium text-slate-700">{t('tasks.advances')}</span>
+                        <Button type="button" variant="outline" size="sm" onClick={addAdvanceBatch} disabled={form.worker_ids.length === 0}>
+                          <Plus className="h-3.5 w-3.5 mr-1" />{t('tasks.addAdvance')}
+                        </Button>
+                      </div>
+                      {form.advance_batches.length === 0 ? (
+                        <p className="text-sm text-slate-400">{t('tasks.noAdvances')}</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {form.advance_batches.map((batch, bi) => (
+                            <div key={batch.id} className="rounded-md border border-slate-200 bg-white p-2 space-y-1.5">
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-semibold text-slate-600">
+                                  {t('tasks.advanceBatch')} #{bi + 1} — {batchAmountSum(batch) > 0 ? formatFCFA(batchAmountSum(batch)) : t('tasks.noAdvances')}
+                                </span>
+                                {form.advance_batches.length > 1 && (
+                                  <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => removeAdvanceBatch(bi)}>
+                                    <X className="h-3.5 w-3.5 text-red-500" />
+                                  </Button>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-slate-500 w-20 shrink-0">{t('tasks.advanceDate')}</span>
+                                <Input type="date" value={batch.date} onChange={(e) => updateAdvanceBatch(bi, { date: e.target.value })} className="h-8 w-44" />
+                              </div>
+                              <div className="grid grid-cols-[1fr_150px] items-center gap-2 text-xs font-medium text-slate-500">
+                                <span>{t('tasks.assignedWorker')}</span>
+                                <span>{t('tasks.advance')}</span>
+                              </div>
+                              {form.worker_ids.map((wid) => (
+                                <div key={wid} className="grid grid-cols-[1fr_150px] items-center gap-2">
+                                  <span className="text-sm text-slate-700">{workers.find((w) => w.id === wid)?.name || '—'}</span>
+                                  <Input
+                                    type="number"
+                                    min={0}
+                                    placeholder="Avance"
+                                    title={t('tasks.advance')}
+                                    value={batch.amounts[wid] ?? 0}
+                                    onChange={(e) => updateAdvanceBatchAmount(bi, wid, Number(e.target.value))}
+                                    className="h-8"
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                     <div className="border-t border-slate-200 pt-2 space-y-1 text-sm">
                       <div className="flex items-center justify-between font-semibold text-slate-700">
                         <span>{t('tasks.totalWage')}</span>

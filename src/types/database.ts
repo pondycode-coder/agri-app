@@ -164,6 +164,14 @@ export interface Worker {
   updated_at: string;
 }
 
+export interface TaskAdvanceBatch {
+  id: string;
+  /** Date the advance was given out (YYYY-MM-DD). */
+  date: string;
+  /** Per-worker amount (worker id -> FCFA). */
+  amounts: Record<string, number>;
+}
+
 export interface FarmTask {
   id: string;
   /** Primary multi-worker assignment array */
@@ -176,6 +184,9 @@ export interface FarmTask {
   worker_advances?: Record<string, number>;
   /** Total advance paid up front for this task (sum of worker_advances). */
   advance_amount?: number;
+  /** Multiple dated advance batches (each has a date + per-worker amounts).
+   *  advance_amount / worker_advances remain the derived running totals. */
+  advance_batches?: TaskAdvanceBatch[];
   title: string;
   description?: string;
   farm_id: string;
@@ -235,10 +246,10 @@ export function getTaskWorkerIds(task: FarmTask): string[] {
   return [];
 }
 
-/** Utility function to format monetary amounts in FCFA / XAF */
+/** Utility function to format monetary amounts ("F" symbol) */
 export function formatFCFA(amount: number): string {
-  if (isNaN(amount) || amount === null || amount === undefined) return '0 FCFA';
+  if (isNaN(amount) || amount === null || amount === undefined) return '0 F';
   return new Intl.NumberFormat('fr-CM', {
     maximumFractionDigits: 0,
-  }).format(amount) + ' FCFA';
+  }).format(amount) + ' F';
 }

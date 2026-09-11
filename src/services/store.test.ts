@@ -178,8 +178,9 @@ describe("LocalDatabaseStore - Tasks & Wages", () => {
 
     const updated = dbStore.saveTask({
       ...task,
-      worker_advances: { "wrk-1": 0 },
+      worker_ids: ["wrk-1"],
       worker_wages: { "wrk-1": 2000 },
+      advance_batches: [],
     });
 
     expect(updated.advance_amount).toBe(0);
@@ -208,6 +209,80 @@ describe("LocalDatabaseStore - Tasks & Wages", () => {
 
     expect(updated.worker_advances).toEqual({ "wrk-1": 500 });
     expect(updated.advance_amount).toBe(500);
+  });
+
+  it("saves multiple dated advance batches and derives totals + the financial record date", () => {
+    const task = dbStore.saveTask({
+      farm_id: "farm-1",
+      worker_ids: ["wrk-1", "wrk-2"],
+      title: "Plantation",
+      status: "in_progress",
+      wage_paid: true,
+      worker_wages: { "wrk-1": 3000, "wrk-2": 2000 },
+      advance_batches: [
+        { id: "b1", date: "2026-09-01", amounts: { "wrk-1": 500, "wrk-2": 300 } },
+        { id: "b2", date: "2026-09-08", amounts: { "wrk-1": 200, "wrk-2": 0 } },
+      ],
+    });
+
+    expect(task.advance_batches).toHaveLength(2);
+    expect(task.advance_amount).toBe(1000); // 800 + 200
+    expect(task.worker_advances).toEqual({ "wrk-1": 700, "wrk-2": 300 });
+
+    const advance = dbStore.getFinancials().find((f) => f.task_id === task.id && f.category === "Avance Salaire");
+    expect(advance).toBeDefined();
+    expect(advance!.amount).toBe(1000);
+    expect(advance!.date).toBe("2026-09-08"); // latest batch date
+    const salary = dbStore.getFinancials().find((f) => f.task_id === task.id && f.category === "Salaires Ouvriers");
+    expect(salary!.amount).toBe(4000); // 5000 - 1000
+  });
+
+  it("drops empty batches but keeps non-zero ones after edits", () => {
+    const task = dbStore.saveTask({
+      farm_id: "farm-1",
+      worker_ids: ["wrk-1"],
+      title: "Récolte",
+      status: "in_progress",
+      worker_wages: { "wrk-1": 1000 },
+      advance_batches: [
+        { id: "b1", date: "2026-09-01", amounts: { "wrk-1": 400 } },
+        { id: "b2", date: "2026-09-05", amounts: { "wrk-1": 0 } },
+      ],
+    });
+
+    expect(task.advance_batches).toHaveLength(1);
+    expect(task.advance_batches![0].id).toBe("b1");
+    expect(task.advance_amount).toBe(400);
+  });
+
+  it("prunes advance batches when workers are removed from the task", () => {
+    const task = dbStore.saveTask({
+      farm_id: "farm-1",
+      worker_ids: ["wrk-1", "wrk-2"],
+      title: "Élagage",
+      status: "in_progress",
+      wage_paid: true,
+      worker_wages: { "wrk-1": 2000, "wrk-2": 1500 },
+      advance_batches: [
+        { id: "b1", date: "2026-09-03", amounts: { "wrk-1": 500, "wrk-2": 300 } },
+      ],
+    });
+
+    const updated = dbStore.saveTask({
+      ...task,
+      worker_ids: ["wrk-1"],
+      worker_wages: { "wrk-1": 2000 },
+      advance_batches: [
+        { id: "b1", date: "2026-09-03", amounts: { "wrk-1": 500, "wrk-2": 300 } },
+      ],
+    });
+
+    expect(updated.advance_batches).toHaveLength(1);
+    expect(updated.advance_batches![0].amounts).toEqual({ "wrk-1": 500 });
+    expect(updated.worker_advances).toEqual({ "wrk-1": 500 });
+    expect(updated.advance_amount).toBe(500);
+    const salary = dbStore.getFinancials().find((f) => f.task_id === task.id && f.category === "Salaires Ouvriers")!;
+    expect(salary.amount).toBe(1500); // 2000 - 500
   });
 });
 

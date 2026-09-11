@@ -105,6 +105,7 @@ export default function HelpPage() {
       { key: 'tasks.5', icon: CheckSquare },
       { key: 'tasks.6', icon: CheckSquare },
       { key: 'tasks.7', icon: CheckSquare },
+      { key: 'tasks.8', icon: CheckSquare },
     ]},
     { id: 'financials', icon: Receipt, subtitle: 'help.financialsSub', steps: [
       { key: 'financials.1', icon: Receipt },
