@@ -60,8 +60,8 @@ class LocalDatabaseStore {
     this.remoteQueue = this.remoteQueue.then(task).catch((e) => console.error(e));
   }
 
-  private async upsertRemote<T>(table: EntityKey, rows: T[]): Promise<boolean> {
-    if (!this.remote?.isActive()) return true;
+  private async upsertRemote<T>(table: EntityKey, rows: T[]): Promise<string | null> {
+    if (!this.remote?.isActive()) return null;
     const currentFarmId = this.remote.farmId;
     const filtered = currentFarmId
       ? rows.filter((r) => {
@@ -70,7 +70,7 @@ class LocalDatabaseStore {
           return row.farm_id === currentFarmId;
         })
       : rows;
-    if (filtered.length === 0) return true;
+    if (filtered.length === 0) return null;
     const result = await this.remote.upsert(
       table,
       filtered.map((r) => {
@@ -80,9 +80,9 @@ class LocalDatabaseStore {
     );
     if (!result.ok) {
       console.warn(`[store] upsertRemote ${table} failed:`, result.error);
-      return false;
+      return `${table}: ${result.error}`;
     }
-    return true;
+    return null;
   }
 
   private async deleteRemote(table: EntityKey, id: string) {
@@ -105,12 +105,12 @@ class LocalDatabaseStore {
         this.upsertRemote<FinancialRecord>('financial_records', this.financials),
         this.upsertRemote<Investment>('investments', this.investments),
       ]);
-      if (results.every(Boolean)) {
+      const failed = results.filter((r): r is string => r !== null);
+      if (failed.length === 0) {
         this.setSyncError(null);
       } else {
-        const failed = ['farms','plots','crop_cycles','harvests','contacts','inventory_items','workers','farm_tasks','financial_records','investments']
-          .filter((_, i) => !results[i]);
-        this.setSyncError(`Échec de synchronisation: ${failed.join(', ')} — vérifiez votre connexion et les permissions.`);
+        const detail = failed.join(' | ');
+        this.setSyncError(`Échec de synchronisation — ${detail}`);
       }
     });
   }
