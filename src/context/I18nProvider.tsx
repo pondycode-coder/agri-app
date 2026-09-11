@@ -34,26 +34,29 @@ export const I18nProvider = ({ children }: { children: ReactNode }) => {
   }, [locale]);
 
   const t = (key: string): string => {
-    // Split the key by dots and traverse the translations object
     const keys = key.split('.');
-    let value: Record<string, unknown> | string = translations[locale] as Record<string, unknown>;
-    for (const k of keys) {
-      if (value && typeof value === 'object' && k in value) {
-        value = value[k] as Record<string, unknown> | string;
-      } else {
-        // Fallback to English if not found in current locale
-        let fallback: Record<string, unknown> | string = translations.en as Record<string, unknown>;
-        for (const k2 of keys) {
-          if (fallback && typeof fallback === 'object' && k2 in fallback) {
-            fallback = fallback[k2] as Record<string, unknown> | string;
-          } else {
-            return key; // Return the key itself if not found
-          }
+    const resolve = (dict: Record<string, unknown>): string | null => {
+      let value: Record<string, unknown> | string | undefined = dict;
+      for (let i = 0; i < keys.length; i++) {
+        // Allow flattened keys nested one level deep, e.g. help['plots.1']
+        const joined = keys.slice(i).join('.');
+        if (value && typeof value === 'object' && joined in value) {
+          const v = (value as Record<string, unknown>)[joined];
+          if (typeof v === 'string') return v;
         }
-        return typeof fallback === 'string' ? fallback : key;
+        const k = keys[i];
+        if (value && typeof value === 'object' && k in value) {
+          value = (value as Record<string, unknown>)[k] as Record<string, unknown> | string | undefined;
+        } else {
+          return null;
+        }
       }
-    }
-    return typeof value === 'string' ? value : key;
+      return typeof value === 'string' ? value : null;
+    };
+    const local = resolve(translations[locale] as Record<string, unknown>);
+    if (local) return local;
+    const fallback = resolve(translations.en as Record<string, unknown>);
+    return fallback ?? key; // Return the key itself if not found
   };
 
   return (
