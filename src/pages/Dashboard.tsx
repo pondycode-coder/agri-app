@@ -71,7 +71,12 @@ export default function Dashboard() {
     .filter((f) => f.type === 'expense')
     .reduce((sum, f) => sum + f.amount, 0);
 
+  const totalInvestorFunding = financials
+    .filter((f) => f.type === 'investment')
+    .reduce((sum, f) => sum + f.amount, 0);
+
   const netProfit = totalIncome - totalExpenses;
+  const netCashFlow = netProfit + totalInvestorFunding;
 
   const totalWagesPaid =
     tasks
@@ -286,17 +291,17 @@ export default function Dashboard() {
             </CardContent>
           </Card>
 
-          <Card className={`border ${netProfit >= 0 ? 'bg-blue-50 border-blue-200' : 'bg-amber-50 border-amber-200'}`}>
+          <Card className={`border ${netCashFlow >= 0 ? 'bg-blue-50 border-blue-200' : 'bg-amber-50 border-amber-200'}`}>
             <CardContent className="p-5 flex items-center justify-between">
               <div>
                 <p className="text-xs font-semibold text-slate-700 uppercase">
                   {t('dashboard.netCashFlow')}
                 </p>
-                <p className={`text-2xl font-extrabold mt-1 ${netProfit >= 0 ? 'text-blue-700' : 'text-amber-700'}`}>
-                  {formatFCFA(netProfit)}
+                <p className={`text-2xl font-extrabold mt-1 ${netCashFlow >= 0 ? 'text-blue-700' : 'text-amber-700'}`}>
+                  {formatFCFA(netCashFlow)}
                 </p>
               </div>
-              <div className={`p-3 text-white rounded-xl shadow-md ${netProfit >= 0 ? 'bg-blue-600' : 'bg-amber-600'}`}>
+              <div className={`p-3 text-white rounded-xl shadow-md ${netCashFlow >= 0 ? 'bg-blue-600' : 'bg-amber-600'}`}>
                 <DollarSign className="h-6 w-6" />
               </div>
             </CardContent>

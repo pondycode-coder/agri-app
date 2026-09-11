@@ -546,6 +546,19 @@ export const INITIAL_FINANCIALS: FinancialRecord[] = [
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   },
+  {
+    id: 'fin-6',
+    type: 'investment',
+    amount: 5000000, // FCFA
+    currency: 'XAF',
+    date: '2025-01-05',
+    description: 'Apport en capital d\'un investisseur (convention de financement)',
+    category: 'Apport Investisseur',
+    farm_id: 'farm-1',
+    payment_method: 'bank_transfer',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
 ];
 
 export const INITIAL_INVESTMENTS: Investment[] = [

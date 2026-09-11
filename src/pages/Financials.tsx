@@ -14,11 +14,12 @@ import { formatFCFA } from '@/types/database';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Receipt, Plus, Pencil, Trash2, TrendingUp, TrendingDown, Search } from 'lucide-react';
+import { Receipt, Plus, Pencil, Trash2, TrendingUp, TrendingDown, Landmark, Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 const INCOME_CATEGORIES = ['Vente Récolte', 'Location Terrain', 'Subvention', 'Autre Revenu'];
 const EXPENSE_CATEGORIES = ['Achat Intrants', 'Salaires Ouvriers', 'Carburant & Énergie', 'Équipement', 'Autre Dépense'];
+const INVESTMENT_CATEGORIES = ['Apport Investisseur', 'Prêt Financement'];
 
 export default function Financials() {
   const { t } = useI18n();
@@ -46,7 +47,7 @@ export default function Financials() {
     return unsub;
   }, []);
 
-  const allCategories = [...INCOME_CATEGORIES, ...EXPENSE_CATEGORIES];
+  const allCategories = [...INCOME_CATEGORIES, ...EXPENSE_CATEGORIES, ...INVESTMENT_CATEGORIES];
 
   const filteredRecords = records
     .filter((r) => {
@@ -60,7 +61,8 @@ export default function Financials() {
 
   const totalIncome = records.filter((r) => r.type === 'income').reduce((s, r) => s + r.amount, 0);
   const totalExpense = records.filter((r) => r.type === 'expense').reduce((s, r) => s + r.amount, 0);
-  const balance = totalIncome - totalExpense;
+  const totalInvestment = records.filter((r) => r.type === 'investment').reduce((s, r) => s + r.amount, 0);
+  const balance = totalIncome + totalInvestment - totalExpense;
 
   const openCreate = () => {
     setEditing(null);
@@ -85,7 +87,7 @@ export default function Financials() {
     if (deleteId) { dbStore.deleteFinancialRecord(deleteId); setDeleteId(null); toast({ title: t('common.successDeleted') }); }
   };
 
-  const categories = form.type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
+  const categories = form.type === 'income' ? INCOME_CATEGORIES : form.type === 'investment' ? INVESTMENT_CATEGORIES : EXPENSE_CATEGORIES;
 
   const methodLabels: Record<string, string> = {
     cash: t('financials.methodCash'),
@@ -105,7 +107,7 @@ export default function Financials() {
           <Button onClick={openCreate} className="bg-emerald-600 hover:bg-emerald-700"><Plus className="h-4 w-4 mr-2" />{t('financials.addRecord')}</Button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card className="bg-emerald-50 border-emerald-200">
             <CardContent className="p-4 flex items-center justify-between">
               <div><p className="text-xs font-semibold text-emerald-800 uppercase">{t('financials.summaryIncome')}</p><p className="text-xl font-bold text-emerald-700 mt-1">{formatFCFA(totalIncome)}</p></div>
@@ -116,6 +118,12 @@ export default function Financials() {
             <CardContent className="p-4 flex items-center justify-between">
               <div><p className="text-xs font-semibold text-rose-800 uppercase">{t('financials.summaryExpense')}</p><p className="text-xl font-bold text-rose-700 mt-1">{formatFCFA(totalExpense)}</p></div>
               <TrendingDown className="h-6 w-6 text-rose-600" />
+            </CardContent>
+          </Card>
+          <Card className="bg-indigo-50 border-indigo-200">
+            <CardContent className="p-4 flex items-center justify-between">
+              <div><p className="text-xs font-semibold text-indigo-800 uppercase">{t('financials.summaryInvestment')}</p><p className="text-xl font-bold text-indigo-700 mt-1">{formatFCFA(totalInvestment)}</p></div>
+              <Landmark className="h-6 w-6 text-indigo-600" />
             </CardContent>
           </Card>
           <Card className={balance >= 0 ? 'bg-blue-50 border-blue-200' : 'bg-amber-50 border-amber-200'}>
@@ -144,6 +152,7 @@ export default function Financials() {
                   <SelectItem value="all">{t('common.filterAll')}</SelectItem>
                   <SelectItem value="income">{t('financials.income')}</SelectItem>
                   <SelectItem value="expense">{t('financials.expense')}</SelectItem>
+                  <SelectItem value="investment">{t('financials.investment')}</SelectItem>
                 </SelectContent>
               </Select>
               <Select value={categoryFilter} onValueChange={setCategoryFilter}>
@@ -172,11 +181,11 @@ export default function Financials() {
                 ) : filteredRecords.map((rec) => (
                   <TableRow key={rec.id}>
                     <TableCell>{rec.date}</TableCell>
-                    <TableCell><Badge className={rec.type === 'income' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}>{rec.type === 'income' ? t('financials.income') : t('financials.expense')}</Badge></TableCell>
+                    <TableCell><Badge className={rec.type === 'income' ? 'bg-emerald-100 text-emerald-800' : rec.type === 'investment' ? 'bg-indigo-100 text-indigo-800' : 'bg-rose-100 text-rose-800'}>{rec.type === 'income' ? t('financials.income') : rec.type === 'investment' ? t('financials.investment') : t('financials.expense')}</Badge></TableCell>
                     <TableCell className="max-w-[200px] truncate">{rec.description}</TableCell>
                     <TableCell><Badge variant="secondary">{rec.category}</Badge></TableCell>
-                    <TableCell className={rec.type === 'income' ? 'text-emerald-700 font-semibold' : 'text-rose-700 font-semibold'}>
-                      {rec.type === 'income' ? '+' : '−'} {formatFCFA(rec.amount)}
+                    <TableCell className={rec.type === 'expense' ? 'text-rose-700 font-semibold' : rec.type === 'investment' ? 'text-indigo-700 font-semibold' : 'text-emerald-700 font-semibold'}>
+                      {rec.type === 'expense' ? '−' : '+'} {formatFCFA(rec.amount)}
                     </TableCell>
                     <TableCell>{methodLabels[rec.payment_method] || rec.payment_method}</TableCell>
                     <TableCell className="text-right space-x-2">
@@ -206,7 +215,7 @@ export default function Financials() {
                 <div><Label>{t('financials.type')}</Label>
                   <Select value={form.type} onValueChange={(v) => setForm({ ...form, type: v as FinancialRecord['type'], category: '' })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent><SelectItem value="income">{t('financials.income')}</SelectItem><SelectItem value="expense">{t('financials.expense')}</SelectItem></SelectContent>
+                    <SelectContent><SelectItem value="income">{t('financials.income')}</SelectItem><SelectItem value="expense">{t('financials.expense')}</SelectItem><SelectItem value="investment">{t('financials.investment')}</SelectItem></SelectContent>
                   </Select>
                 </div>
                 <div><Label>{t('financials.amount')}</Label><Input type="number" min={0} value={form.amount} onChange={(e) => setForm({ ...form, amount: parseInt(e.target.value) || 0 })} /></div>

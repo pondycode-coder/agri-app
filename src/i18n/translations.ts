@@ -241,6 +241,8 @@ export const translations = {
       type: 'Type de Transaction',
       income: 'Recette (+)',
       expense: 'Dépense (-)',
+      investment: 'Apport Investisseur (Capital)',
+      investmentCategory: 'Apport / Capital Investisseur',
       amount: 'Montant (FCFA)',
       date: 'Date',
       category: 'Catégorie Comptable',
@@ -253,6 +255,7 @@ export const translations = {
       methodBank: 'Virement / Chèque Banque',
       summaryIncome: 'Total Recettes',
       summaryExpense: 'Total Dépenses',
+      summaryInvestment: "Apports Investisseurs",
       summaryBalance: 'Solde Net',
     },
     // Contacts Module
@@ -670,6 +673,8 @@ export const translations = {
       type: 'Transaction Type',
       income: 'Income (+)',
       expense: 'Expense (-)',
+      investment: 'Investor Funding (Capital)',
+      investmentCategory: 'Investor Capital / Funding',
       amount: 'Amount (FCFA)',
       date: 'Date',
       category: 'Category',
@@ -682,6 +687,7 @@ export const translations = {
       methodBank: 'Bank Transfer / Check',
       summaryIncome: 'Total Income',
       summaryExpense: 'Total Expenses',
+      summaryInvestment: 'Investor Funding',
       summaryBalance: 'Net Balance',
     },
     // Contacts Module

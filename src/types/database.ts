@@ -193,7 +193,7 @@ export interface FarmTask {
 
 export interface FinancialRecord {
   id: string;
-  type: 'income' | 'expense';
+  type: 'income' | 'expense' | 'investment';
   amount: number; // in FCFA
   currency: 'XAF';
   date: string;
