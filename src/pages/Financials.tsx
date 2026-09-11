@@ -14,7 +14,7 @@ import { formatFCFA } from '@/types/database';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Receipt, Plus, Pencil, Trash2, TrendingUp, TrendingDown, Landmark, Search } from 'lucide-react';
+import { Receipt, Plus, Pencil, Trash2, TrendingUp, TrendingDown, Landmark, Filter, Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 const INCOME_CATEGORIES = ['Vente Récolte', 'Location Terrain', 'Subvention', 'Autre Revenu'];
@@ -59,10 +59,12 @@ export default function Financials() {
     })
     .sort((a, b) => b.date.localeCompare(a.date));
 
-  const totalIncome = records.filter((r) => r.type === 'income').reduce((s, r) => s + r.amount, 0);
-  const totalExpense = records.filter((r) => r.type === 'expense').reduce((s, r) => s + r.amount, 0);
-  const totalInvestment = records.filter((r) => r.type === 'investment').reduce((s, r) => s + r.amount, 0);
+  const totalIncome = filteredRecords.filter((r) => r.type === 'income').reduce((s, r) => s + r.amount, 0);
+  const totalExpense = filteredRecords.filter((r) => r.type === 'expense').reduce((s, r) => s + r.amount, 0);
+  const totalInvestment = filteredRecords.filter((r) => r.type === 'investment').reduce((s, r) => s + r.amount, 0);
   const balance = totalIncome + totalInvestment - totalExpense;
+
+  const filtersActive = !!search.trim() || typeFilter !== 'all' || categoryFilter !== 'all';
 
   const openCreate = () => {
     setEditing(null);
@@ -108,6 +110,14 @@ export default function Financials() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {filtersActive && (
+            <div className="md:col-span-4 -mb-2">
+              <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 border border-slate-300 px-2.5 py-0.5 text-[11px] font-medium text-slate-600">
+                <Filter className="h-3 w-3" />
+                {t('financials.filteredLabel')}
+              </span>
+            </div>
+          )}
           <Card className="bg-emerald-50 border-emerald-200">
             <CardContent className="p-4 flex items-center justify-between">
               <div><p className="text-xs font-semibold text-emerald-800 uppercase">{t('financials.summaryIncome')}</p><p className="text-xl font-bold text-emerald-700 mt-1">{formatFCFA(totalIncome)}</p></div>

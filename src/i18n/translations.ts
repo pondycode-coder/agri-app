@@ -257,6 +257,7 @@ export const translations = {
       summaryExpense: 'Total Dépenses',
       summaryInvestment: "Apports Investisseurs",
       summaryBalance: 'Solde Net',
+      filteredLabel: 'Résultats filtrés',
     },
     // Contacts Module
     contacts: {
@@ -689,6 +690,7 @@ export const translations = {
       summaryExpense: 'Total Expenses',
       summaryInvestment: 'Investor Funding',
       summaryBalance: 'Net Balance',
+      filteredLabel: 'Filtered results',
     },
     // Contacts Module
     contacts: {
