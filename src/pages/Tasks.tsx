@@ -440,7 +440,7 @@ export default function Tasks() {
                             <div key={batch.id} className="rounded-md border border-slate-200 bg-white p-2 space-y-1.5">
                               <div className="flex items-center justify-between">
                                 <span className="text-xs font-semibold text-slate-600">
-                                  {t('tasks.advanceBatch')} #{bi + 1} — {batchAmountSum(batch) > 0 ? formatFCFA(batchAmountSum(batch)) : t('tasks.noAdvances')}
+                                  {t('tasks.advanceBatch')} #{bi + 1} · {batch.date || '—'} · {batchAmountSum(batch) > 0 ? formatFCFA(batchAmountSum(batch)) : t('tasks.noAdvances')}
                                 </span>
                                 {form.advance_batches.length > 1 && (
                                   <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => removeAdvanceBatch(bi)}>
