@@ -15,6 +15,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Sprout, Plus, Pencil, Trash2, Search, Timer, TrendingUp, LandPlot, Wallet, ChevronRight, ChevronDown, StickyNote } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { Pagination, PAGE_SIZE, clampPage } from '@/components/Pagination';
 
 const statusColors: Record<string, string> = {
   planted: 'bg-blue-100 text-blue-800',
@@ -42,6 +43,7 @@ export default function CropCycles() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'overdue' | CropCycle['status']>('all');
+  const [page, setPage] = useState(1);
   const [harvestDialog, setHarvestDialog] = useState<{ open: boolean; cycleId: string; cycleName: string }>({ open: false, cycleId: '', cycleName: '' });
   const [harvestForm, setHarvestForm] = useState({ harvest_date: todayIso(), quantity: 0, unit: 'bunch' as string, revenue_fcfa: 0, notes: '' });
 
@@ -105,6 +107,13 @@ export default function CropCycles() {
     const db = b.expected_harvest_date || b.planting_date || '';
     return da.localeCompare(db);
   });
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, statusFilter]);
+
+  const cp = clampPage(page, sortedCrops.length);
+  const paginatedCrops = sortedCrops.slice((cp - 1) * PAGE_SIZE, cp * PAGE_SIZE);
 
   const activeCycles = crops.filter((c) => c.status === 'planted' || c.status === 'growing');
   const activeArea = [...new Set(activeCycles.map((c) => c.plot_id))].reduce(
@@ -246,9 +255,9 @@ export default function CropCycles() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sortedCrops.length === 0 ? (
+                {paginatedCrops.length === 0 ? (
                   <TableRow><TableCell colSpan={9} className="text-center py-8 text-slate-500">{t('common.noData')}</TableCell></TableRow>
-                ) : sortedCrops.map((crop) => {
+                ) : paginatedCrops.map((crop) => {
                   const ts = totals(crop);
                   const unitsList = Object.entries(ts.units).filter(([, q]) => q > 0);
                   const expanded = expandedId === crop.id;
@@ -363,6 +372,7 @@ export default function CropCycles() {
                 })}
               </TableBody>
             </Table>
+            <Pagination total={sortedCrops.length} page={cp} onPageChange={setPage} />
           </CardContent>
         </Card>
 

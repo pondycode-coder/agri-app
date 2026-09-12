@@ -15,6 +15,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { BookUser, Plus, Pencil, Trash2, Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { Pagination, PAGE_SIZE, clampPage } from '@/components/Pagination';
 
 const typeLabels: Record<string, string> = {
   customer: 'Client', supplier: 'Fournisseur', partner: 'Partenaire',
@@ -30,6 +31,7 @@ export default function Contacts() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<'all' | Contact['type']>('all');
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     const refresh = () => setContacts(dbStore.getContacts());
@@ -44,6 +46,13 @@ export default function Contacts() {
     const matchesType = typeFilter === 'all' || c.type === typeFilter;
     return matchesSearch && matchesType;
   });
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, typeFilter]);
+
+  const cp = clampPage(page, filteredContacts.length);
+  const paginatedContacts = filteredContacts.slice((cp - 1) * PAGE_SIZE, cp * PAGE_SIZE);
 
   const openCreate = () => {
     setEditing(null);
@@ -116,9 +125,9 @@ export default function Contacts() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredContacts.length === 0 ? (
+                {paginatedContacts.length === 0 ? (
                   <TableRow><TableCell colSpan={6} className="text-center py-8 text-slate-500">{t('common.noData')}</TableCell></TableRow>
-                ) : filteredContacts.map((c) => (
+                ) : paginatedContacts.map((c) => (
                   <TableRow key={c.id}>
                     <TableCell className="font-medium">{c.name}</TableCell>
                     <TableCell><Badge className={typeBadgeColor[c.type] || ''}>{typeLabels[c.type] || c.type}</Badge></TableCell>
@@ -141,6 +150,7 @@ export default function Contacts() {
                 ))}
               </TableBody>
             </Table>
+            <Pagination total={filteredContacts.length} page={cp} onPageChange={setPage} />
           </CardContent>
         </Card>
 

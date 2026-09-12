@@ -15,6 +15,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Users, Plus, Pencil, Trash2, Search, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { Pagination, PAGE_SIZE, clampPage } from '@/components/Pagination';
 
 const roleLabels: Record<string, string> = {
   field_worker: 'Ouvrier', agronomist: 'Agronome', machine_operator: 'Conducteur', supervisor: 'Chef d\'équipe',
@@ -33,6 +34,7 @@ export default function Workers() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [roleFilter, setRoleFilter] = useState<'all' | Worker['role']>('all');
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     const refresh = () => {
@@ -83,6 +85,13 @@ export default function Workers() {
     const matchesRole = roleFilter === 'all' || w.role === roleFilter;
     return matchesSearch && matchesStatus && matchesRole;
   });
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, statusFilter, roleFilter]);
+
+  const cp = clampPage(page, filteredWorkers.length);
+  const paginatedWorkers = filteredWorkers.slice((cp - 1) * PAGE_SIZE, cp * PAGE_SIZE);
 
   return (
     <MainLayout>
@@ -143,9 +152,9 @@ export default function Workers() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredWorkers.length === 0 ? (
+                {paginatedWorkers.length === 0 ? (
                   <TableRow><TableCell colSpan={7} className="text-center py-8 text-slate-500">{t('common.noData')}</TableCell></TableRow>
-                ) : filteredWorkers.map((w) => (
+                ) : paginatedWorkers.map((w) => (
                   <TableRow key={w.id}>
                     <TableCell className="font-medium">{w.name}</TableCell>
                     <TableCell><Badge variant="secondary">{roleLabels[w.role] || w.role}</Badge></TableCell>
@@ -174,6 +183,7 @@ export default function Workers() {
                 ))}
               </TableBody>
             </Table>
+            <Pagination total={filteredWorkers.length} page={cp} onPageChange={setPage} />
           </CardContent>
         </Card>
 

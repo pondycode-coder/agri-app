@@ -14,6 +14,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Grid as GridIcon, Plus, Pencil, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { Pagination, PAGE_SIZE, clampPage } from '@/components/Pagination';
 
 const statusColors: Record<string, string> = {
   active: 'bg-emerald-100 text-emerald-800',
@@ -32,6 +33,9 @@ export default function Plots() {
   const [editingPlot, setEditingPlot] = useState<Plot | null>(null);
   const [form, setForm] = useState({ farm_id: '', name: '', size_in_hectares: 1, soil_type: 'Volcanique', status: 'active' as Plot['status'] });
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const cp = clampPage(page, plots.length);
+  const paginatedPlots = plots.slice((cp - 1) * PAGE_SIZE, cp * PAGE_SIZE);
 
   useEffect(() => {
     const unsub = dbStore.subscribe(() => setTick((p) => p + 1));
@@ -110,12 +114,12 @@ export default function Plots() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {plots.length === 0 ? (
+                {paginatedPlots.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center py-8 text-slate-500">{t('common.noData')}</TableCell>
                   </TableRow>
                 ) : (
-                  plots.map((plot) => (
+                  paginatedPlots.map((plot) => (
                     <TableRow key={plot.id}>
                       <TableCell className="font-medium">{plot.name}</TableCell>
                       <TableCell>{getFarmName(plot.farm_id)}</TableCell>
@@ -149,6 +153,7 @@ export default function Plots() {
                 )}
               </TableBody>
             </Table>
+            <Pagination total={plots.length} page={cp} onPageChange={setPage} />
           </CardContent>
         </Card>
 

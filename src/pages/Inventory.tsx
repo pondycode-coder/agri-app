@@ -15,6 +15,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Package, Plus, Pencil, Trash2, AlertTriangle, Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { Pagination, PAGE_SIZE, clampPage } from '@/components/Pagination';
 
 const catLabels: Record<string, string> = {
   input: 'Intrants', pesticide: 'Phytosanitaire', tool: 'Outillage', equipment: 'Équipement', fuel: 'Carburant', packaging: 'Emballage',
@@ -31,6 +32,7 @@ export default function Inventory() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<'all' | InventoryItem['category']>('all');
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     const refresh = () => {
@@ -48,6 +50,13 @@ export default function Inventory() {
     const matchesCategory = categoryFilter === 'all' || item.category === categoryFilter;
     return matchesSearch && matchesCategory;
   });
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, categoryFilter]);
+
+  const cp = clampPage(page, filteredItems.length);
+  const paginatedItems = filteredItems.slice((cp - 1) * PAGE_SIZE, cp * PAGE_SIZE);
 
   const openCreate = () => {
     setEditing(null);
@@ -124,9 +133,9 @@ export default function Inventory() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredItems.length === 0 ? (
+                {paginatedItems.length === 0 ? (
                   <TableRow><TableCell colSpan={6} className="text-center py-8 text-slate-500">{t('common.noData')}</TableCell></TableRow>
-                ) : filteredItems.map((item) => (
+                ) : paginatedItems.map((item) => (
                   <TableRow key={item.id}>
                     <TableCell className="font-medium">{item.name}</TableCell>
                     <TableCell><Badge variant="secondary">{catLabels[item.category] || item.category}</Badge></TableCell>
@@ -149,6 +158,7 @@ export default function Inventory() {
                 ))}
               </TableBody>
             </Table>
+            <Pagination total={filteredItems.length} page={cp} onPageChange={setPage} />
           </CardContent>
         </Card>
 

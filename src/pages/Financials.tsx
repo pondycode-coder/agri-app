@@ -16,6 +16,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Receipt, Plus, Pencil, Trash2, TrendingUp, TrendingDown, Landmark, Filter, Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { Pagination, PAGE_SIZE, clampPage } from '@/components/Pagination';
 
 const INCOME_CATEGORIES = ['Vente Récolte', 'Location Terrain', 'Subvention', 'Autre Revenu'];
 const EXPENSE_CATEGORIES = ['Achat Intrants', 'Salaires Ouvriers', 'Avance Salaire', 'Carburant & Énergie', 'Équipement', 'Autre Dépense'];
@@ -37,7 +38,6 @@ export default function Financials() {
   const [typeFilter, setTypeFilter] = useState<'all' | FinancialRecord['type']>('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [page, setPage] = useState(1);
-  const PAGE_SIZE = 8;
 
   useEffect(() => {
     const refresh = () => {
@@ -74,9 +74,8 @@ export default function Financials() {
     setPage(1);
   }, [search, typeFilter, categoryFilter]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredRecords.length / PAGE_SIZE));
-  const currentPage = Math.min(page, totalPages);
-  const paginatedRecords = filteredRecords.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const cp = clampPage(page, filteredRecords.length);
+  const paginatedRecords = filteredRecords.slice((cp - 1) * PAGE_SIZE, cp * PAGE_SIZE);
 
   const totalIncome = filteredRecords.filter((r) => r.type === 'income').reduce((s, r) => s + r.amount, 0);
   const totalExpense = filteredRecords.filter((r) => r.type === 'expense').reduce((s, r) => s + r.amount, 0);
@@ -233,25 +232,7 @@ export default function Financials() {
                 ))}
               </TableBody>
             </Table>
-            <div className="flex items-center justify-between px-4 py-3 border-t">
-              <span className="text-sm text-slate-500">
-                {filteredRecords.length === 0
-                  ? '0 – 0'
-                  : `${(currentPage - 1) * PAGE_SIZE + 1} – ${Math.min(currentPage * PAGE_SIZE, filteredRecords.length)}`}{' '}
-                / {filteredRecords.length}
-              </span>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)}>
-                  {t('common.prev')}
-                </Button>
-                <span className="text-sm text-slate-600">
-                  {t('common.page')} {currentPage} / {totalPages}
-                </span>
-                <Button variant="outline" size="sm" disabled={currentPage >= totalPages} onClick={() => setPage(currentPage + 1)}>
-                  {t('common.next')}
-                </Button>
-              </div>
-            </div>
+            <Pagination total={filteredRecords.length} page={cp} onPageChange={setPage} />
           </CardContent>
         </Card>
 

@@ -16,6 +16,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { TrendingUp, Plus, Pencil, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { Pagination, PAGE_SIZE, clampPage } from '@/components/Pagination';
 
 const typeLabels: Record<string, string> = {
   equipment: 'Équipement', infrastructure: 'Infrastructure', irrigation: 'Irrigation', land: 'Foncier', other: 'Autre',
@@ -39,6 +40,9 @@ export default function Investments() {
     description: '', expected_return: 0, return_date: '', status: 'active' as Investment['status'],
   });
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const cp = clampPage(page, investments.length);
+  const paginatedInvestments = investments.slice((cp - 1) * PAGE_SIZE, cp * PAGE_SIZE);
 
   useEffect(() => {
     const unsub = dbStore.subscribe(() => setTick((p) => p + 1));
@@ -101,9 +105,9 @@ export default function Investments() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {investments.length === 0 ? (
+                {paginatedInvestments.length === 0 ? (
                   <TableRow><TableCell colSpan={7} className="text-center py-8 text-slate-500">{t('common.noData')}</TableCell></TableRow>
-                ) : investments.map((inv) => (
+                ) : paginatedInvestments.map((inv) => (
                   <TableRow key={inv.id}>
                     <TableCell className="font-medium">{inv.name}</TableCell>
                     <TableCell><Badge variant="secondary">{typeLabels[inv.type] || inv.type}</Badge></TableCell>
@@ -127,6 +131,7 @@ export default function Investments() {
                 ))}
               </TableBody>
             </Table>
+            <Pagination total={investments.length} page={cp} onPageChange={setPage} />
           </CardContent>
         </Card>
 

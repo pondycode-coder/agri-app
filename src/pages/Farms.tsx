@@ -14,6 +14,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tractor, Plus, Pencil, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { Pagination, PAGE_SIZE, clampPage } from '@/components/Pagination';
 
 export default function Farms() {
   const { t } = useI18n();
@@ -24,6 +25,9 @@ export default function Farms() {
   const [editingFarm, setEditingFarm] = useState<Farm | null>(null);
   const [form, setForm] = useState({ name: '', location: '', size_in_hectares: 1, description: '' });
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const cp = clampPage(page, farms.length);
+  const paginatedFarms = farms.slice((cp - 1) * PAGE_SIZE, cp * PAGE_SIZE);
 
   useEffect(() => {
     const unsub = dbStore.subscribe(() => setTick((p) => p + 1));
@@ -91,12 +95,12 @@ export default function Farms() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {farms.length === 0 ? (
+                {paginatedFarms.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={5} className="text-center py-8 text-slate-500">{t('common.noData')}</TableCell>
                   </TableRow>
                 ) : (
-                  farms.map((farm) => (
+                  paginatedFarms.map((farm) => (
                     <TableRow key={farm.id}>
                       <TableCell className="font-medium">{farm.name}</TableCell>
                       <TableCell>{farm.location}</TableCell>
@@ -129,6 +133,7 @@ export default function Farms() {
                 )}
               </TableBody>
             </Table>
+            <Pagination total={farms.length} page={cp} onPageChange={setPage} />
           </CardContent>
         </Card>
 

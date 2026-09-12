@@ -17,6 +17,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { CheckSquare, Plus, Pencil, Trash2, ChevronDown, Search, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { Pagination, PAGE_SIZE, clampPage } from '@/components/Pagination';
 import { formatFCFA } from '@/types/database';
 
 const statusColors: Record<string, string> = {
@@ -46,6 +47,7 @@ export default function Tasks() {
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | FarmTask['status']>('all');
+  const [page, setPage] = useState(1);
 
   const refresh = () => {
     setTasks(dbStore.getTasks());
@@ -207,6 +209,13 @@ export default function Tasks() {
     })
     .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
 
+  useEffect(() => {
+    setPage(1);
+  }, [search, statusFilter]);
+
+  const cp = clampPage(page, filteredTasks.length);
+  const paginatedTasks = filteredTasks.slice((cp - 1) * PAGE_SIZE, cp * PAGE_SIZE);
+
 
   return (
     <MainLayout>
@@ -258,9 +267,9 @@ export default function Tasks() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredTasks.length === 0 ? (
+                {paginatedTasks.length === 0 ? (
                   <TableRow><TableCell colSpan={10} className="text-center py-8 text-slate-500">{t('common.noData')}</TableCell></TableRow>
-                ) : filteredTasks.map((task) => {
+                ) : paginatedTasks.map((task) => {
                   const batches = getAdvanceBatches(task);
                   const isExpanded = expandedTaskId === task.id;
                   return (
@@ -344,6 +353,7 @@ export default function Tasks() {
                 })}
               </TableBody>
             </Table>
+            <Pagination total={filteredTasks.length} page={cp} onPageChange={setPage} />
           </CardContent>
         </Card>
 
