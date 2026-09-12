@@ -164,7 +164,7 @@ export const MainLayout = ({ children }: { children: React.ReactNode }) => {
       {/* Sidebar Navigation */}
       <aside
         className={`
-          fixed md:static inset-y-0 left-0 z-40 w-64 bg-slate-900 text-slate-100 flex flex-col justify-between transition-transform duration-200 ease-in-out border-r border-slate-800
+          fixed md:static inset-y-0 left-0 z-40 w-64 bg-slate-900 text-slate-100 border-r border-slate-800 transition-transform duration-200 ease-in-out
           ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
         `}
       >
@@ -190,7 +190,7 @@ export const MainLayout = ({ children }: { children: React.ReactNode }) => {
           </div>
 
           {/* Navigation Links */}
-          <nav className="p-3 space-y-1 overflow-y-auto max-h-[calc(100vh-14rem)]">
+          <nav className="p-3 space-y-1">
             {navItems
               .filter((item) =>
                 item.resource === 'dashboard' || item.resource === 'saas-admin'
