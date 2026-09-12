@@ -36,6 +36,8 @@ export default function Financials() {
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<'all' | FinancialRecord['type']>('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 8;
 
   useEffect(() => {
     const refresh = () => {
@@ -67,6 +69,14 @@ export default function Financials() {
       return matchesSearch && matchesType && matchesCategory;
     })
     .sort((a, b) => b.date.localeCompare(a.date));
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, typeFilter, categoryFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredRecords.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const paginatedRecords = filteredRecords.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   const totalIncome = filteredRecords.filter((r) => r.type === 'income').reduce((s, r) => s + r.amount, 0);
   const totalExpense = filteredRecords.filter((r) => r.type === 'expense').reduce((s, r) => s + r.amount, 0);
@@ -195,9 +205,9 @@ export default function Financials() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredRecords.length === 0 ? (
+                {paginatedRecords.length === 0 ? (
                   <TableRow><TableCell colSpan={7} className="text-center py-8 text-slate-500">{t('common.noData')}</TableCell></TableRow>
-                ) : filteredRecords.map((rec) => (
+                ) : paginatedRecords.map((rec) => (
                   <TableRow key={rec.id}>
                     <TableCell>{rec.date}</TableCell>
                     <TableCell><Badge className={rec.type === 'income' ? 'bg-emerald-100 text-emerald-800' : rec.type === 'investment' ? 'bg-indigo-100 text-indigo-800' : 'bg-rose-100 text-rose-800'}>{rec.type === 'income' ? t('financials.income') : rec.type === 'investment' ? t('financials.investment') : t('financials.expense')}</Badge></TableCell>
@@ -223,6 +233,25 @@ export default function Financials() {
                 ))}
               </TableBody>
             </Table>
+            <div className="flex items-center justify-between px-4 py-3 border-t">
+              <span className="text-sm text-slate-500">
+                {filteredRecords.length === 0
+                  ? '0 – 0'
+                  : `${(currentPage - 1) * PAGE_SIZE + 1} – ${Math.min(currentPage * PAGE_SIZE, filteredRecords.length)}`}{' '}
+                / {filteredRecords.length}
+              </span>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)}>
+                  {t('common.prev')}
+                </Button>
+                <span className="text-sm text-slate-600">
+                  {t('common.page')} {currentPage} / {totalPages}
+                </span>
+                <Button variant="outline" size="sm" disabled={currentPage >= totalPages} onClick={() => setPage(currentPage + 1)}>
+                  {t('common.next')}
+                </Button>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
