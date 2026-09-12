@@ -18,7 +18,7 @@ import { Receipt, Plus, Pencil, Trash2, TrendingUp, TrendingDown, Landmark, Filt
 import { useToast } from '@/hooks/use-toast';
 
 const INCOME_CATEGORIES = ['Vente Récolte', 'Location Terrain', 'Subvention', 'Autre Revenu'];
-const EXPENSE_CATEGORIES = ['Achat Intrants', 'Salaires Ouvriers', 'Carburant & Énergie', 'Équipement', 'Autre Dépense'];
+const EXPENSE_CATEGORIES = ['Achat Intrants', 'Salaires Ouvriers', 'Avance Salaire', 'Carburant & Énergie', 'Équipement', 'Autre Dépense'];
 const INVESTMENT_CATEGORIES = ['Apport Investisseur', 'Prêt Financement'];
 
 export default function Financials() {
@@ -47,7 +47,16 @@ export default function Financials() {
     return unsub;
   }, []);
 
-  const allCategories = [...INCOME_CATEGORIES, ...EXPENSE_CATEGORIES, ...INVESTMENT_CATEGORIES];
+  const uniqueCategories = (arr: string[]) => [...new Set(arr)].filter(Boolean);
+
+  const dataCategories = uniqueCategories(records.map((r) => r.category));
+  const allCategories = uniqueCategories([...INCOME_CATEGORIES, ...EXPENSE_CATEGORIES, ...INVESTMENT_CATEGORIES, ...dataCategories]);
+
+  const categoryOptions = (type: FinancialRecord['type']) =>
+    uniqueCategories([
+      ...(type === 'income' ? INCOME_CATEGORIES : type === 'investment' ? INVESTMENT_CATEGORIES : EXPENSE_CATEGORIES),
+      ...records.filter((r) => r.type === type).map((r) => r.category),
+    ]);
 
   const filteredRecords = records
     .filter((r) => {
@@ -89,7 +98,7 @@ export default function Financials() {
     if (deleteId) { dbStore.deleteFinancialRecord(deleteId); setDeleteId(null); toast({ title: t('common.successDeleted') }); }
   };
 
-  const categories = form.type === 'income' ? INCOME_CATEGORIES : form.type === 'investment' ? INVESTMENT_CATEGORIES : EXPENSE_CATEGORIES;
+  const categories = categoryOptions(form.type);
 
   const methodLabels: Record<string, string> = {
     cash: t('financials.methodCash'),
