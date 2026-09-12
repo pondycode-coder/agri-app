@@ -313,7 +313,7 @@ export default function Tasks() {
                             <div className="py-2 space-y-2">
                               <div className="flex items-center justify-between">
                                 <span className="text-sm font-semibold text-slate-700">{t('tasks.advances')}</span>
-                                <span className="text-xs text-slate-500">{t('tasks.totalAdvance')} : {formatFCFA(task.advance_amount ?? 0)}</span>
+                                <span className="text-xs text-slate-500">{t('tasks.netToPay')} : {formatFCFA(Math.max(0, (task.wage_amount ?? 0) - (task.advance_amount ?? 0)))}</span>
                               </div>
                               {batches.length === 0 ? (
                                 <p className="text-sm text-slate-400">{t('tasks.noAdvances')}</p>
