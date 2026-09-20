@@ -47,6 +47,7 @@ export default function Tasks() {
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | FarmTask['status']>('all');
+  const [dueDateFilter, setDueDateFilter] = useState('');
   const [page, setPage] = useState(1);
 
   const refresh = () => {
@@ -205,13 +206,14 @@ export default function Tasks() {
       const workerNames = getWorkerWageBreakdown(task).map((w) => w.name.toLowerCase()).join(' ');
       const matchesSearch = !q || task.title.toLowerCase().includes(q) || workerNames.includes(q);
       const matchesStatus = statusFilter === 'all' || task.status === statusFilter;
-      return matchesSearch && matchesStatus;
+      const matchesDate = !dueDateFilter || (task.due_date || '') === dueDateFilter;
+      return matchesSearch && matchesStatus && matchesDate;
     })
     .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
 
   useEffect(() => {
     setPage(1);
-  }, [search, statusFilter]);
+  }, [search, statusFilter, dueDateFilter]);
 
   const cp = clampPage(page, filteredTasks.length);
   const paginatedTasks = filteredTasks.slice((cp - 1) * PAGE_SIZE, cp * PAGE_SIZE);
@@ -250,6 +252,21 @@ export default function Tasks() {
                   <SelectItem value="cancelled">{t('tasks.statusCancelled')}</SelectItem>
                 </SelectContent>
               </Select>
+              <div className="relative">
+                <Input
+                  type="date"
+                  value={dueDateFilter}
+                  onChange={(e) => setDueDateFilter(e.target.value)}
+                  className="w-full sm:w-44"
+                  title={t('tasks.filterByDueDate')}
+                />
+                {dueDateFilter && (
+                  <Button type="button" variant="ghost" size="icon" className="absolute right-0 top-0 h-full w-8"
+                    onClick={() => setDueDateFilter('')}>
+                    <X className="h-4 w-4 text-slate-400" />
+                  </Button>
+                )}
+              </div>
             </div>
             <Table>
               <TableHeader>
@@ -327,7 +344,7 @@ export default function Tasks() {
                               {batches.length === 0 ? (
                                 <p className="text-sm text-slate-400">{t('tasks.noAdvances')}</p>
                               ) : (
-                                <div className="grid gap-2 sm:grid-cols-2">
+                                <div className="grid gap-2 sm:grid-cols-3">
                                   {batches.map((b) => (
                                     <div key={b.id} className="rounded-md border border-slate-200 bg-white p-2">
                                       <div className="flex items-center justify-between mb-1">

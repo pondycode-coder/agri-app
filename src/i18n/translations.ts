@@ -237,6 +237,7 @@ export const translations = {
       statusInProgress: 'En Cours',
       statusCompleted: 'Terminée',
       statusCancelled: 'Annulée',
+      filterByDueDate: 'Filtrer par date limite',
     },
     // Financials Module
     financials: {
@@ -820,6 +821,7 @@ export const translations = {
       statusInProgress: 'In Progress',
       statusCompleted: 'Completed',
       statusCancelled: 'Cancelled',
+      filterByDueDate: 'Filter by due date',
     },
     // Financials Module
     financials: {
