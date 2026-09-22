@@ -318,4 +318,26 @@ describe("LocalDatabaseStore - CRUD", () => {
     });
     expect(item.quantity * item.price_per_unit).toBe(50000);
   });
+
+  it("records the full wage as Salaires Ouvriers when advances cover the entire wage", () => {
+    const task = dbStore.saveTask({
+      farm_id: "farm-1",
+      worker_ids: ["wrk-1", "wrk-2"],
+      title: "Récolte cacao",
+      status: "completed",
+      wage_paid: true,
+      worker_wages: { "wrk-1": 2000, "wrk-2": 1500 },
+      worker_advances: { "wrk-1": 2000, "wrk-2": 1500 },
+    });
+
+    expect(task.wage_amount).toBe(3500);
+    expect(task.advance_amount).toBe(3500);
+
+    const advance = dbStore.getFinancials().find((f) => f.task_id === task.id && f.category === "Avance Salaire");
+    const salary = dbStore.getFinancials().find((f) => f.task_id === task.id && f.category === "Salaires Ouvriers");
+
+    expect(advance).toBeUndefined();
+    expect(salary).toBeDefined();
+    expect(salary!.amount).toBe(3500); // net is 0, advance fully covers wage
+  });
 });

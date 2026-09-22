@@ -720,13 +720,18 @@ class LocalDatabaseStore {
 
     // Salary settlement = wage MINUS the advance already paid.
     const existingExpense = this.financials.find((f) => f.task_id === savedTask.id && f.category === 'Salaires Ouvriers');
-    if (savedTask.status !== 'cancelled' && wagePaid && netWageAmount > 0) {
+    const fullyAdvanced = wageAmount > 0 && advanceAmount >= wageAmount;
+    if (savedTask.status !== 'cancelled' && wagePaid && (netWageAmount > 0 || fullyAdvanced)) {
+      if (fullyAdvanced) {
+        const advanceRec = this.financials.find((f) => f.task_id === savedTask.id && f.category === 'Avance Salaire');
+        if (advanceRec) this.financials = this.financials.filter((f) => f.id !== advanceRec.id);
+      }
       if (existingExpense) {
         this.financials = this.financials.map((f) =>
           f.id === existingExpense.id
             ? {
                 ...f,
-                amount: netWageAmount,
+                amount: fullyAdvanced ? wageAmount : netWageAmount,
                 worker_id: assignedWorkerIds[0] || null,
                 date: savedTask.completed_date || savedTask.due_date || new Date().toISOString().split('T')[0],
                 updated_at: now,
@@ -737,7 +742,7 @@ class LocalDatabaseStore {
         this.financials.push({
           id: crypto.randomUUID(),
           type: 'expense',
-          amount: netWageAmount,
+          amount: fullyAdvanced ? wageAmount : netWageAmount,
           currency: 'XAF',
           date: savedTask.completed_date || savedTask.due_date || new Date().toISOString().split('T')[0],
           description: 'Paiement des salaires du personnel',
