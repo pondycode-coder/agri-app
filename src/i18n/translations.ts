@@ -265,6 +265,13 @@ export const translations = {
       summaryInvestment: "Apports Investisseurs",
       summaryBalance: 'Solde Net',
       filteredLabel: 'Résultats filtrés',
+      periodToday: "Aujourd'hui",
+      periodWeek: '7 derniers jours',
+      periodMonth: 'Ce mois',
+      periodQuarter: 'Ce trimestre',
+      periodYear: 'Cette année',
+      dateFrom: 'Du',
+      dateTo: 'Au',
     },
     // Contacts Module
     contacts: {
@@ -849,6 +856,13 @@ export const translations = {
       summaryInvestment: 'Investor Funding',
       summaryBalance: 'Net Balance',
       filteredLabel: 'Filtered results',
+      periodToday: 'Today',
+      periodWeek: 'Last 7 days',
+      periodMonth: 'This month',
+      periodQuarter: 'This quarter',
+      periodYear: 'This year',
+      dateFrom: 'From',
+      dateTo: 'To',
     },
     // Contacts Module
     contacts: {

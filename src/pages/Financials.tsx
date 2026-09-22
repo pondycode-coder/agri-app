@@ -37,6 +37,9 @@ export default function Financials() {
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<'all' | FinancialRecord['type']>('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
+  const [periodFilter, setPeriodFilter] = useState('all');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [page, setPage] = useState(1);
 
   useEffect(() => {
@@ -60,29 +63,59 @@ export default function Financials() {
       ...records.filter((r) => r.type === type).map((r) => r.category),
     ]);
 
+  const inPeriod = (d: string) => {
+    if (periodFilter === 'all') return true;
+    const today = new Date();
+    const date = new Date(d + 'T00:00:00');
+    if (periodFilter === 'today') {
+      const t = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      return date.getTime() === t.getTime();
+    }
+    if (periodFilter === 'week') {
+      const start = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 7);
+      return date >= start && date <= new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+    }
+    if (periodFilter === 'month') {
+      const start = new Date(today.getFullYear(), today.getMonth(), 1);
+      return date >= start && date <= new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+    }
+    if (periodFilter === 'quarter') {
+      const q = Math.floor(today.getMonth() / 3);
+      const start = new Date(today.getFullYear(), q * 3, 1);
+      return date >= start && date <= new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+    }
+    if (periodFilter === 'year') {
+      const start = new Date(today.getFullYear(), 0, 1);
+      return date >= start && date <= new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+    }
+    return true;
+  };
+
   const filteredRecords = records
     .filter((r) => {
       const q = search.trim().toLowerCase();
       const matchesSearch = !q || r.description.toLowerCase().includes(q) || r.category.toLowerCase().includes(q);
       const matchesType = typeFilter === 'all' || r.type === typeFilter;
       const matchesCategory = categoryFilter === 'all' || r.category === categoryFilter;
-      return matchesSearch && matchesType && matchesCategory;
+      const matchesPeriod = inPeriod(r.date);
+      const matchesDateRange = (!dateFrom || r.date >= dateFrom) && (!dateTo || r.date <= dateTo);
+      return matchesSearch && matchesType && matchesCategory && matchesPeriod && matchesDateRange;
     })
     .sort((a, b) => b.date.localeCompare(a.date));
 
   useEffect(() => {
     setPage(1);
-  }, [search, typeFilter, categoryFilter]);
+  }, [search, typeFilter, categoryFilter, periodFilter, dateFrom, dateTo]);
 
   const cp = clampPage(page, filteredRecords.length);
   const paginatedRecords = filteredRecords.slice((cp - 1) * PAGE_SIZE, cp * PAGE_SIZE);
 
-  const totalIncome = filteredRecords.filter((r) => r.type === 'income').reduce((s, r) => s + r.amount, 0);
+  const totalIncome = records.filter((r) => r.type === 'income').reduce((s, r) => s + r.amount, 0);
+  const totalInvestment = records.filter((r) => r.type === 'investment').reduce((s, r) => s + r.amount, 0);
   const totalExpense = filteredRecords.filter((r) => r.type === 'expense').reduce((s, r) => s + r.amount, 0);
-  const totalInvestment = filteredRecords.filter((r) => r.type === 'investment').reduce((s, r) => s + r.amount, 0);
   const balance = totalIncome + totalInvestment - totalExpense;
 
-  const filtersActive = !!search.trim() || typeFilter !== 'all' || categoryFilter !== 'all';
+  const filtersActive = !!search.trim() || typeFilter !== 'all' || categoryFilter !== 'all' || periodFilter !== 'all' || !!dateFrom || !!dateTo;
 
   const openCreate = () => {
     setEditing(null);
@@ -190,6 +223,19 @@ export default function Financials() {
                   {allCategories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                 </SelectContent>
               </Select>
+              <Select value={periodFilter} onValueChange={(v) => setPeriodFilter(v)}>
+                <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t('common.filterAll')}</SelectItem>
+                  <SelectItem value="today">{t('financials.periodToday')}</SelectItem>
+                  <SelectItem value="week">{t('financials.periodWeek')}</SelectItem>
+                  <SelectItem value="month">{t('financials.periodMonth')}</SelectItem>
+                  <SelectItem value="quarter">{t('financials.periodQuarter')}</SelectItem>
+                  <SelectItem value="year">{t('financials.periodYear')}</SelectItem>
+                </SelectContent>
+              </Select>
+              <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="w-40" title={t('financials.dateFrom')} />
+              <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="w-40" title={t('financials.dateTo')} />
             </div>
             <Table>
               <TableHeader>
