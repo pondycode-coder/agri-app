@@ -877,10 +877,17 @@ class LocalDatabaseStore {
     return savedTask;
   }
   public deleteTask(id: string) {
+    const linkedFinancialIds = this.financials.filter((f) => f.task_id === id).map((f) => f.id);
     this.tasks = this.tasks.filter((t) => t.id !== id);
     this.financials = this.financials.filter((f) => f.task_id !== id);
     this.saveAll();
     this.queueRemote(() => this.deleteRemote('farm_tasks', id));
+    // The auto-generated Avance/Salaires records must be removed in the cloud
+    // too — pushAllToRemote only upserts, it never deletes, so without this
+    // the orphaned records reappear after the next remote hydration.
+    for (const finId of linkedFinancialIds) {
+      this.queueRemote(() => this.deleteRemote('financial_records', finId));
+    }
   }
 
   // --- FINANCIALS ---

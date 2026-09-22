@@ -328,6 +328,7 @@ class FakeBackend extends SupabaseBackend {
   public failUpsert = false;
   public removeCalls = 0;
   public failRemove = false;
+  public removes: Array<{ table: EntityKey; id: string }> = [];
   constructor(farmId: string) {
     super(farmId);
   }
@@ -349,6 +350,7 @@ class FakeBackend extends SupabaseBackend {
   }
   async remove(_table: EntityKey, _id: string): Promise<{ ok: boolean; error?: string }> {
     this.removeCalls += 1;
+    this.removes.push({ table: _table, id: _id });
     if (this.failRemove) return { ok: false, error: "permission denied" };
     return { ok: true };
   }
@@ -411,5 +413,29 @@ describe("LocalDatabaseStore - remote sync", () => {
     await flush();
 
     expect(dbStore.getWorkers()).toHaveLength(0);
+  });
+
+  it("mirrors deletion of a task's linked financial records to the remote", async () => {
+    const backend = new FakeBackend("farm-1");
+    dbStore.attachRemote(backend);
+
+    const task = dbStore.saveTask({
+      farm_id: "farm-1",
+      worker_id: "wrk-1",
+      title: "Récolte cacao",
+      wage_amount: 3500,
+      status: "completed",
+      wage_paid: true,
+    });
+    const linkedIds = dbStore.getFinancials().filter((f) => f.task_id === task.id).map((f) => f.id);
+    expect(linkedIds.length).toBeGreaterThan(0);
+
+    dbStore.deleteTask(task.id);
+    await flush();
+
+    expect(backend.removes.some((r) => r.table === "farm_tasks")).toBe(true);
+    for (const id of linkedIds) {
+      expect(backend.removes.some((r) => r.table === "financial_records" && r.id === id)).toBe(true);
+    }
   });
 });
