@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useI18n } from '@/context/I18nProvider';
 import { useAuth } from '@/context/AuthProvider';
+import { dbStore } from '@/services/store';
+import { SyncStatusBar } from '@/components/SyncStatusBar';
 import { hasPermission, Resource } from '@/utils/rbac';
 import { Link, useLocation } from 'react-router-dom';
 import {
@@ -58,6 +60,11 @@ export const MainLayout = ({ children }: { children: React.ReactNode }) => {
   const { toast } = useToast();
 
   const activeFarm = farms.find((f) => f.id === activeFarmId) || null;
+
+  // Wire online/offline listeners so slow-connection sync resumes automatically.
+  useEffect(() => {
+    dbStore.bindNetworkEvents();
+  }, []);
 
   const navItems: Array<{ path: string; label: string; icon: LucideIcon; resource: Resource | 'saas-admin' }> = [
     { path: '/dashboard', label: t('layout.sidebar.dashboard'), icon: LayoutDashboard, resource: 'dashboard' as const },
@@ -347,6 +354,7 @@ export const MainLayout = ({ children }: { children: React.ReactNode }) => {
 
         {/* Page Container */}
         <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
+          <SyncStatusBar />
           {children}
         </main>
       </div>

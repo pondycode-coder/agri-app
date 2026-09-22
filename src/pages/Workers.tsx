@@ -13,7 +13,7 @@ import { Worker } from '@/types/database';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Users, Plus, Pencil, Trash2, Search, AlertTriangle } from 'lucide-react';
+import { Users, Plus, Pencil, Trash2, Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Pagination, PAGE_SIZE, clampPage } from '@/components/Pagination';
 
@@ -26,7 +26,6 @@ export default function Workers() {
   const { toast } = useToast();
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [farms, setFarms] = useState<ReturnType<typeof dbStore.getFarms>>([]);
-  const [syncError, setSyncError] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Worker | null>(null);
   const [form, setForm] = useState({ farm_id: '', name: '', role: 'field_worker' as Worker['role'], phone_number: '', is_active: true });
@@ -40,7 +39,6 @@ export default function Workers() {
     const refresh = () => {
       setWorkers(dbStore.getWorkers());
       setFarms(dbStore.getFarms());
-      setSyncError(dbStore.lastSyncError);
     };
     const unsub = dbStore.subscribe(refresh);
     refresh();
@@ -96,12 +94,6 @@ export default function Workers() {
   return (
     <MainLayout>
       <div className="space-y-6">
-        {syncError && (
-          <div className="flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
-            <AlertTriangle className="h-4 w-4 flex-shrink-0" />
-            <span>{syncError}</span>
-          </div>
-        )}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold flex items-center gap-2"><Users className="h-6 w-6 text-emerald-600" />{t('workers.title')}</h1>

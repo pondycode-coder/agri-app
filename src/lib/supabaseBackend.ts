@@ -61,8 +61,9 @@ export class SupabaseBackend {
     }
     const { data, error } = await q;
     if (error) {
-      console.error(`[supabase] fetch ${table}:`, error.message);
-      return [];
+      const msg = `fetch ${table}: ${error.message}`;
+      console.error(`[supabase] ${msg}`);
+      throw new Error(msg);
     }
     return (data || []) as T[];
   }
@@ -78,10 +79,14 @@ export class SupabaseBackend {
     return { ok: true };
   }
 
-  public async remove(table: EntityKey, id: string) {
-    if (!this.isActive()) return;
+  public async remove(table: EntityKey, id: string): Promise<{ ok: boolean; error?: string }> {
+    if (!this.isActive()) return { ok: true };
     const { error } = await supabase.from(table).delete().eq('id', id);
-    if (error) console.error(`[supabase] delete ${table}:`, error.message);
+    if (error) {
+      console.error(`[supabase] delete ${table}:`, error.message);
+      return { ok: false, error: error.message };
+    }
+    return { ok: true };
   }
 
   // --- tenant bootstrap --------------------------------------------------
@@ -235,7 +240,13 @@ export class SupabaseBackend {
   /** First-run: persist the seed farm so a fresh tenant has baseline data. */
   public async seedFarmIfEmpty(farmId: string): Promise<void> {
     if (!this.isConfigured()) return;
-    const existing = await this.fetchAll<Farm>('farms');
+    let existing: Farm[] = [];
+    try {
+      existing = await this.fetchAll<Farm>('farms');
+    } catch (err) {
+      console.error('[supabase] seedFarmIfEmpty fetch failed:', err);
+      return;
+    }
     if (existing.length > 0) return;
     const { error } = await supabase.from('farms').upsert({
       id: farmId,

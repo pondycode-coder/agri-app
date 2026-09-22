@@ -1,5 +1,6 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { dbStore } from "@/services/store";
+import { SupabaseBackend, EntityKey } from "@/lib/supabaseBackend";
 
 beforeEach(() => {
   dbStore.resetToDefaults();
@@ -339,5 +340,98 @@ describe("LocalDatabaseStore - CRUD", () => {
     expect(advance).toBeUndefined();
     expect(salary).toBeDefined();
     expect(salary!.amount).toBe(3500); // net is 0, advance fully covers wage
+  });
+});
+
+class FakeBackend extends SupabaseBackend {
+  public fetchCalls = 0;
+  public failFetch = false;
+  public upsertCalls = 0;
+  public failUpsert = false;
+  public removeCalls = 0;
+  public failRemove = false;
+  constructor(farmId: string) {
+    super(farmId);
+  }
+  isConfigured() {
+    return true;
+  }
+  isActive() {
+    return Boolean(this.farmId);
+  }
+  async fetchAll<T>(_table: EntityKey): Promise<T[]> {
+    this.fetchCalls += 1;
+    if (this.failFetch) throw new Error("network down");
+    return [];
+  }
+  async upsert(_table: EntityKey, _rows: Record<string, unknown>[]): Promise<{ ok: boolean; error?: string }> {
+    this.upsertCalls += 1;
+    if (this.failUpsert) return { ok: false, error: "permission denied" };
+    return { ok: true };
+  }
+  async remove(_table: EntityKey, _id: string): Promise<{ ok: boolean; error?: string }> {
+    this.removeCalls += 1;
+    if (this.failRemove) return { ok: false, error: "permission denied" };
+    return { ok: true };
+  }
+}
+
+const flush = () => new Promise((resolve) => setTimeout(resolve, 10));
+
+describe("LocalDatabaseStore - remote sync", () => {
+  afterEach(() => {
+    dbStore.attachRemote(null);
+  });
+
+  it("does not wipe the local cache when remote hydration fails", async () => {
+    const backend = new FakeBackend("farm-1");
+    backend.failFetch = true;
+    dbStore.attachRemote(backend);
+
+    const localNames = dbStore.getWorkers().map((w) => w.name);
+    await dbStore.hydrateFromRemote("farm-1");
+
+    expect(dbStore.getWorkers().map((w) => w.name)).toEqual(localNames);
+    expect(dbStore.lastSyncError).toContain("Échec");
+  });
+
+  it("surfaces a failed delete through lastSyncError", async () => {
+    const backend = new FakeBackend("farm-1");
+    backend.failRemove = true;
+    dbStore.attachRemote(backend);
+
+    const id = dbStore.getWorkers()[0].id;
+    dbStore.deleteWorker(id);
+    await flush();
+
+    expect(backend.removeCalls).toBeGreaterThan(0);
+    expect(dbStore.lastSyncError).toContain("workers");
+  });
+
+  it("clears the sync error after a successful retry", async () => {
+    const backend = new FakeBackend("farm-1");
+    backend.failUpsert = true;
+    dbStore.attachRemote(backend);
+
+    dbStore.saveWorker({ farm_id: "farm-1", name: "Test", role: "field_worker" });
+    await flush();
+    expect(dbStore.lastSyncError).not.toBeNull();
+
+    backend.failUpsert = false;
+    dbStore.syncNow();
+    await flush();
+
+    expect(dbStore.lastSyncError).toBeNull();
+    expect(dbStore.lastSyncedAt).not.toBeNull();
+  });
+
+  it("applies remote data after a successful hydration", async () => {
+    const backend = new FakeBackend("farm-1");
+    dbStore.attachRemote(backend);
+
+    await dbStore.hydrateFromRemote("farm-1");
+    await flush();
+
+    expect(dbStore.getWorkers()).toHaveLength(0);
   });
 });

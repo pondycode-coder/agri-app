@@ -584,6 +584,10 @@ export const translations = {
       'roles.3': 'Ouvrier : consulte l\'état des exploitations, l\'inventaire et ses tâches, et met à jour l\'avancement de ses propres tâches.',
       sync: {
         title: 'Synchronisation & Cloud',
+        retry: 'Réessayer',
+        offline: 'Mode hors ligne — vos modifications seront synchronisées automatiquement au retour de la connexion.',
+        syncing: 'Synchronisation en cours…',
+        synced: 'Synchronisé',
       },
       syncSub: 'Données locales et cloud',
       'sync.1': 'Chaque modification est stockée d\'abord localement (fonctionne hors-ligne) puis synchronisée automatiquement dès que la connexion est rétablie.',
@@ -1174,6 +1178,10 @@ export const translations = {
       'roles.3': 'Worker: views farm state, inventory and their tasks, and updates the progress of their own tasks.',
       sync: {
         title: 'Sync & Cloud',
+        retry: 'Retry',
+        offline: 'Offline mode — your changes will sync automatically when you are back online.',
+        syncing: 'Syncing…',
+        synced: 'Synced',
       },
       syncSub: 'Local and cloud data',
       'sync.1': 'Every change is stored locally first (works offline) then synced automatically as soon as the connection is restored.',

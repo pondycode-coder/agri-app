@@ -43,9 +43,78 @@ class LocalDatabaseStore {
   /** Last remote-sync error message (null when in sync). UI can subscribe. */
   private _lastSyncError: string | null = null;
   public get lastSyncError(): string | null { return this._lastSyncError; }
+
+  /** True while a full-table push is in flight. */
+  private _isSyncing = false;
+  public get isSyncing(): boolean { return this._isSyncing; }
+  private setSyncing(v: boolean) {
+    if (this._isSyncing === v) return;
+    this._isSyncing = v;
+    this.notify();
+  }
+
+  /** ISO timestamp of the last fully successful push (null before first sync). */
+  private _lastSyncedAt: string | null = null;
+  public get lastSyncedAt(): string | null { return this._lastSyncedAt; }
+
+  /** Browser connectivity flag (initialised at module load). */
+  private _isOnline = typeof navigator === 'undefined' ? true : navigator.onLine;
+  public get isOnline(): boolean { return this._isOnline; }
+
+  private retryAttempt = 0;
+  private retryTimer: ReturnType<typeof setTimeout> | null = null;
+  private networkBound = false;
+
+  /** Re-push the whole cache to Supabase (used by the UI retry button). */
+  public syncNow() {
+    if (!this.remote?.isActive()) return;
+    this.pushAllToRemote();
+  }
+
   private setSyncError(msg: string | null) {
     this._lastSyncError = msg;
+    if (msg) {
+      this.scheduleRetry();
+    } else {
+      this.retryAttempt = 0;
+      this.clearRetryTimer();
+    }
     this.notify();
+  }
+
+  /** Exponential backoff re-push (5s → 10s → 20s, capped at 30s, max 10 tries). */
+  private scheduleRetry() {
+    if (!this._isOnline || this.retryAttempt > 10) return;
+    this.clearRetryTimer();
+    const delay = Math.min(30000, 5000 * 2 ** Math.min(this.retryAttempt, 3));
+    this.retryAttempt += 1;
+    this.retryTimer = setTimeout(() => {
+      this.retryTimer = null;
+      if (this.remote?.isActive()) this.pushAllToRemote();
+    }, delay);
+  }
+
+  private clearRetryTimer() {
+    if (this.retryTimer) {
+      clearTimeout(this.retryTimer);
+      this.retryTimer = null;
+    }
+  }
+
+  /** Wire browser online/offline events so sync resumes automatically. */
+  public bindNetworkEvents() {
+    if (this.networkBound || typeof window === 'undefined') return;
+    this.networkBound = true;
+    window.addEventListener('online', () => {
+      this._isOnline = true;
+      this.notify();
+      this.pushAllToRemote();
+    });
+    window.addEventListener('offline', () => {
+      this._isOnline = false;
+      this.clearRetryTimer();
+      this.notify();
+    });
   }
 
   public attachRemote(backend: SupabaseBackend | null) {
@@ -57,8 +126,20 @@ class LocalDatabaseStore {
     return Boolean(this.remote?.isActive());
   }
 
-  private queueRemote(task: () => Promise<void>) {
-    this.remoteQueue = this.remoteQueue.then(task).catch((e) => console.error(e));
+  /**
+   * Run a remote task on the serial queue. A returned error message or a
+   * thrown error is surfaced through lastSyncError so the UI can react.
+   */
+  private queueRemote(task: () => Promise<string | null | void>) {
+    this.remoteQueue = this.remoteQueue
+      .then(() => task())
+      .then((err) => {
+        if (typeof err === 'string') this.setSyncError(`Échec de synchronisation — ${err}`);
+      })
+      .catch((e) => {
+        console.error(e);
+        this.setSyncError(`Échec de synchronisation — ${(e as Error).message || 'erreur inconnue'}`);
+      });
   }
 
   private async upsertRemote<T>(table: EntityKey, rows: T[]): Promise<string | null> {
@@ -86,63 +167,90 @@ class LocalDatabaseStore {
     return null;
   }
 
-  private async deleteRemote(table: EntityKey, id: string) {
-    if (!this.remote?.isActive()) return;
-    await this.remote.remove(table, id);
+  private async deleteRemote(table: EntityKey, id: string): Promise<string | null> {
+    if (!this.remote?.isActive()) return null;
+    const result = await this.remote.remove(table, id);
+    if (!result.ok) {
+      console.warn(`[store] deleteRemote ${table} failed:`, result.error);
+      return `${table}: ${result.error}`;
+    }
+    return null;
   }
 
   private pushAllToRemote() {
     if (!this.remote?.isActive()) return;
     this.queueRemote(async () => {
-      const results = await Promise.all([
-        this.upsertRemote<Farm>('farms', this.farms),
-        this.upsertRemote<Plot>('plots', this.plots),
-        this.upsertRemote<CropCycle>('crop_cycles', this.cropCycles),
-        this.upsertRemote<Harvest>('harvests', this.harvests),
-        this.upsertRemote<Contact>('contacts', this.contacts),
-        this.upsertRemote<InventoryItem>('inventory_items', this.inventory),
-        this.upsertRemote<Worker>('workers', this.workers),
-        this.upsertRemote<FarmTask>('farm_tasks', this.tasks),
-        this.upsertRemote<FinancialRecord>('financial_records', this.financials),
-        this.upsertRemote<Investment>('investments', this.investments),
-      ]);
-      const failed = results.filter((r): r is string => r !== null);
-      if (failed.length === 0) {
-        this.setSyncError(null);
-      } else {
-        const detail = failed.join(' | ');
-        this.setSyncError(`Échec de synchronisation — ${detail}`);
+      this.setSyncing(true);
+      try {
+        const results = await Promise.all([
+          this.upsertRemote<Farm>('farms', this.farms),
+          this.upsertRemote<Plot>('plots', this.plots),
+          this.upsertRemote<CropCycle>('crop_cycles', this.cropCycles),
+          this.upsertRemote<Harvest>('harvests', this.harvests),
+          this.upsertRemote<Contact>('contacts', this.contacts),
+          this.upsertRemote<InventoryItem>('inventory_items', this.inventory),
+          this.upsertRemote<Worker>('workers', this.workers),
+          this.upsertRemote<FarmTask>('farm_tasks', this.tasks),
+          this.upsertRemote<FinancialRecord>('financial_records', this.financials),
+          this.upsertRemote<Investment>('investments', this.investments),
+        ]);
+        const failed = results.filter((r): r is string => r !== null);
+        if (failed.length === 0) {
+          this._lastSyncedAt = new Date().toISOString();
+          this.setSyncError(null);
+        } else {
+          const detail = failed.join(' | ');
+          this.setSyncError(`Échec de synchronisation — ${detail}`);
+        }
+      } finally {
+        this.setSyncing(false);
       }
     });
   }
 
-  /** Load the tenant's live data from Supabase into the local cache. */
+  /**
+   * Load the tenant's live data from Supabase into the local cache.
+   * A failed fetch NEVER replaces the local cache (which may hold offline
+   * edits) — the connection error is surfaced through lastSyncError instead.
+   */
   public async hydrateFromRemote(farmId: string) {
     if (!this.remote?.isConfigured()) return;
     this.remote.farmId = farmId;
-    const [farms, plots, cropCycles, harvests, contacts, inventory, workers, tasks, financials, investments] =
-      await Promise.all([
-        this.remote.fetchAll<Farm>('farms'),
-        this.remote.fetchAll<Plot>('plots'),
-        this.remote.fetchAll<CropCycle>('crop_cycles'),
-        this.remote.fetchAll<Harvest>('harvests'),
-        this.remote.fetchAll<Contact>('contacts'),
-        this.remote.fetchAll<InventoryItem>('inventory_items'),
-        this.remote.fetchAll<Worker>('workers'),
-        this.remote.fetchAll<FarmTask>('farm_tasks'),
-        this.remote.fetchAll<FinancialRecord>('financial_records'),
-        this.remote.fetchAll<Investment>('investments'),
-      ]);
-    this.farms = farms;
-    this.plots = plots;
-    this.cropCycles = cropCycles;
-    this.harvests = harvests;
-    this.contacts = contacts;
-    this.inventory = inventory;
-    this.workers = workers;
-    this.tasks = tasks;
-    this.financials = financials;
-    this.investments = investments;
+    let loaded: {
+      farms: Farm[]; plots: Plot[]; cropCycles: CropCycle[]; harvests: Harvest[];
+      contacts: Contact[]; inventory: InventoryItem[]; workers: Worker[];
+      tasks: FarmTask[]; financials: FinancialRecord[]; investments: Investment[];
+    };
+    try {
+      const [farms, plots, cropCycles, harvests, contacts, inventory, workers, tasks, financials, investments] =
+        await Promise.all([
+          this.remote.fetchAll<Farm>('farms'),
+          this.remote.fetchAll<Plot>('plots'),
+          this.remote.fetchAll<CropCycle>('crop_cycles'),
+          this.remote.fetchAll<Harvest>('harvests'),
+          this.remote.fetchAll<Contact>('contacts'),
+          this.remote.fetchAll<InventoryItem>('inventory_items'),
+          this.remote.fetchAll<Worker>('workers'),
+          this.remote.fetchAll<FarmTask>('farm_tasks'),
+          this.remote.fetchAll<FinancialRecord>('financial_records'),
+          this.remote.fetchAll<Investment>('investments'),
+        ]);
+      loaded = { farms, plots, cropCycles, harvests, contacts, inventory, workers, tasks, financials, investments };
+    } catch (e) {
+      console.error('[store] hydrateFromRemote failed — keeping local cache:', e);
+      this.setSyncError(`Échec de synchronisation — ${(e as Error).message || 'fetch failed'}`);
+      return;
+    }
+    this.farms = loaded.farms;
+    this.plots = loaded.plots;
+    this.cropCycles = loaded.cropCycles;
+    this.harvests = loaded.harvests;
+    this.contacts = loaded.contacts;
+    this.inventory = loaded.inventory;
+    this.workers = loaded.workers;
+    this.tasks = loaded.tasks;
+    this.financials = loaded.financials;
+    this.investments = loaded.investments;
     this.saveAll();
   }
 
