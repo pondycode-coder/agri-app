@@ -329,6 +329,7 @@ class FakeBackend extends SupabaseBackend {
   public removeCalls = 0;
   public failRemove = false;
   public removes: Array<{ table: EntityKey; id: string }> = [];
+  public tables: Record<string, unknown[]> = {};
   constructor(farmId: string) {
     super(farmId);
   }
@@ -341,7 +342,7 @@ class FakeBackend extends SupabaseBackend {
   async fetchAll<T>(_table: EntityKey): Promise<T[]> {
     this.fetchCalls += 1;
     if (this.failFetch) throw new Error("network down");
-    return [];
+    return (this.tables[_table] || []) as T[];
   }
   async upsert(_table: EntityKey, _rows: Record<string, unknown>[]): Promise<{ ok: boolean; error?: string }> {
     this.upsertCalls += 1;
@@ -437,5 +438,35 @@ describe("LocalDatabaseStore - remote sync", () => {
     for (const id of linkedIds) {
       expect(backend.removes.some((r) => r.table === "financial_records" && r.id === id)).toBe(true);
     }
+  });
+
+  it("prunes orphaned task-linked financial records after hydration", async () => {
+    const backend = new FakeBackend("farm-1");
+    const now = new Date().toISOString();
+    backend.tables["financial_records"] = [
+      {
+        id: "fin-orphan",
+        type: "expense",
+        amount: 1000,
+        currency: "XAF",
+        date: "2026-09-01",
+        description: "Paiement des salaires du personnel",
+        category: "Salaires Ouvriers",
+        farm_id: "farm-1",
+        worker_id: "wrk-1",
+        payment_method: "cash",
+        related_contact_id: null,
+        task_id: "task-deleted-1",
+        created_at: now,
+        updated_at: now,
+      },
+    ];
+    dbStore.attachRemote(backend);
+
+    await dbStore.hydrateFromRemote("farm-1");
+    await flush();
+
+    expect(dbStore.getFinancials().some((f) => f.id === "fin-orphan")).toBe(false);
+    expect(backend.removes.some((r) => r.table === "financial_records" && r.id === "fin-orphan")).toBe(true);
   });
 });

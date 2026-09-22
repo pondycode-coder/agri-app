@@ -251,7 +251,27 @@ class LocalDatabaseStore {
     this.tasks = loaded.tasks;
     this.financials = loaded.financials;
     this.investments = loaded.investments;
+    this.pruneOrphanFinancials();
     this.saveAll();
+  }
+
+  /**
+   * Drop financial records whose task_id points to a task that no longer
+   * exists (e.g. created before deleteTask mirrored linked records) and
+   * delete those orphans from the cloud too. Keeps legacy data from
+   * resurrecting deleted records after every hydration.
+   */
+  private pruneOrphanFinancials() {
+    if (this.financials.length === 0) return;
+    const validTaskIds = new Set(this.tasks.map((t) => t.id));
+    const orphans = this.financials.filter((f) => f.task_id && !validTaskIds.has(f.task_id));
+    if (orphans.length === 0) return;
+    const orphanIds = new Set(orphans.map((f) => f.id));
+    this.financials = this.financials.filter((f) => !orphanIds.has(f.id));
+    for (const orphan of orphans) {
+      console.warn(`[store] pruning orphaned financial record ${orphan.id} (task ${orphan.task_id} deleted)`);
+      this.queueRemote(() => this.deleteRemote('financial_records', orphan.id));
+    }
   }
 
   /** Demo/offline farm switch: re-reads localStorage and notifies subscribers. */
