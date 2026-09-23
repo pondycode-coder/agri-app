@@ -153,11 +153,35 @@ class LocalDatabaseStore {
         })
       : rows;
     if (filtered.length === 0) return null;
+    let toSend = filtered;
+    if (table === 'financial_records') {
+      // Never push records whose task no longer exists — the FK would reject
+      // them (legacy orphans are pruned on hydration; this guards pushes).
+      const taskIds = new Set(this.tasks.map((t) => t.id));
+      toSend = filtered.filter((r) => {
+        const taskId = (r as Record<string, unknown>).task_id;
+        return !taskId || taskIds.has(String(taskId));
+      });
+    }
+    if (toSend.length === 0) return null;
     const result = await this.remote.upsert(
       table,
-      filtered.map((r) => {
+      toSend.map((r) => {
         const { created_at, updated_at, ...rest } = r as Record<string, unknown>;
-        return { ...rest, updated_at: new Date().toISOString() };
+        let row: Record<string, unknown> = { ...rest, updated_at: new Date().toISOString() };
+        if (table === 'farm_tasks') {
+          // Guard DB NOT NULL constraints that have no default for nulls:
+          // pre-migration rows hydrated as null would otherwise be re-pushed.
+          row = {
+            ...row,
+            worker_ids: Array.isArray(row.worker_ids) ? row.worker_ids : [],
+            worker_wages: row.worker_wages && typeof row.worker_wages === 'object' ? row.worker_wages : {},
+            worker_advances: row.worker_advances && typeof row.worker_advances === 'object' ? row.worker_advances : {},
+            advance_amount: typeof row.advance_amount === 'number' ? row.advance_amount : 0,
+            advance_batches: Array.isArray(row.advance_batches) ? row.advance_batches : [],
+          };
+        }
+        return row;
       }),
     );
     if (!result.ok) {
@@ -182,19 +206,30 @@ class LocalDatabaseStore {
     this.queueRemote(async () => {
       this.setSyncing(true);
       try {
-        const results = await Promise.all([
-          this.upsertRemote<Farm>('farms', this.farms),
-          this.upsertRemote<Plot>('plots', this.plots),
-          this.upsertRemote<CropCycle>('crop_cycles', this.cropCycles),
-          this.upsertRemote<Harvest>('harvests', this.harvests),
-          this.upsertRemote<Contact>('contacts', this.contacts),
-          this.upsertRemote<InventoryItem>('inventory_items', this.inventory),
-          this.upsertRemote<Worker>('workers', this.workers),
-          this.upsertRemote<FarmTask>('farm_tasks', this.tasks),
-          this.upsertRemote<FinancialRecord>('financial_records', this.financials),
-          this.upsertRemote<Investment>('investments', this.investments),
-        ]);
-        const failed = results.filter((r): r is string => r !== null);
+        // Upserts run sequentially in foreign-key dependency order so child
+        // rows never race ahead of the parents they reference (farm_tasks →
+        // financial_records, plots → crop_cycles → harvests).
+        const failed: string[] = [];
+        let err = await this.upsertRemote<Farm>('farms', this.farms);
+        if (err) failed.push(err);
+        err = await this.upsertRemote<Plot>('plots', this.plots);
+        if (err) failed.push(err);
+        err = await this.upsertRemote<Worker>('workers', this.workers);
+        if (err) failed.push(err);
+        err = await this.upsertRemote<Contact>('contacts', this.contacts);
+        if (err) failed.push(err);
+        err = await this.upsertRemote<InventoryItem>('inventory_items', this.inventory);
+        if (err) failed.push(err);
+        err = await this.upsertRemote<Investment>('investments', this.investments);
+        if (err) failed.push(err);
+        err = await this.upsertRemote<CropCycle>('crop_cycles', this.cropCycles);
+        if (err) failed.push(err);
+        err = await this.upsertRemote<Harvest>('harvests', this.harvests);
+        if (err) failed.push(err);
+        err = await this.upsertRemote<FarmTask>('farm_tasks', this.tasks);
+        if (err) failed.push(err);
+        err = await this.upsertRemote<FinancialRecord>('financial_records', this.financials);
+        if (err) failed.push(err);
         if (failed.length === 0) {
           this._lastSyncedAt = new Date().toISOString();
           this.setSyncError(null);
@@ -768,8 +803,8 @@ class LocalDatabaseStore {
               ...taskData,
               worker_ids: assignedWorkerIds,
               worker_id: assignedWorkerIds[0] || null,
-              worker_wages: workerWages,
-              worker_advances: workerAdvances,
+              worker_wages: workerWages ?? {},
+              worker_advances: workerAdvances ?? {},
               advance_amount: advanceAmount,
               advance_batches: advanceBatches,
               wage_amount: wageAmount,
@@ -788,8 +823,8 @@ class LocalDatabaseStore {
         plot_id: taskData.plot_id || null,
         worker_ids: assignedWorkerIds,
         worker_id: assignedWorkerIds[0] || null,
-        worker_wages: workerWages,
-        worker_advances: workerAdvances,
+        worker_wages: workerWages ?? {},
+        worker_advances: workerAdvances ?? {},
         advance_amount: advanceAmount,
         advance_batches: advanceBatches,
         wage_amount: wageAmount,

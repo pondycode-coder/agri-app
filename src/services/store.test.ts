@@ -326,6 +326,7 @@ class FakeBackend extends SupabaseBackend {
   public failFetch = false;
   public upsertCalls = 0;
   public failUpsert = false;
+  public upserts: Array<{ table: EntityKey; rows: Record<string, unknown>[] }> = [];
   public removeCalls = 0;
   public failRemove = false;
   public removes: Array<{ table: EntityKey; id: string }> = [];
@@ -346,6 +347,7 @@ class FakeBackend extends SupabaseBackend {
   }
   async upsert(_table: EntityKey, _rows: Record<string, unknown>[]): Promise<{ ok: boolean; error?: string }> {
     this.upsertCalls += 1;
+    this.upserts.push({ table: _table, rows: _rows });
     if (this.failUpsert) return { ok: false, error: "permission denied" };
     return { ok: true };
   }
@@ -468,5 +470,57 @@ describe("LocalDatabaseStore - remote sync", () => {
 
     expect(dbStore.getFinancials().some((f) => f.id === "fin-orphan")).toBe(false);
     expect(backend.removes.some((r) => r.table === "financial_records" && r.id === "fin-orphan")).toBe(true);
+  });
+
+  it("normalizes null farm_tasks JSONB columns before pushing", async () => {
+    const backend = new FakeBackend("farm-1");
+    const now = new Date().toISOString();
+    backend.tables["farm_tasks"] = [
+      {
+        id: "task-null-cols",
+        title: "Tâche héritée",
+        farm_id: "farm-1",
+        status: "pending",
+        worker_ids: null,
+        worker_wages: null,
+        worker_advances: null,
+        advance_amount: null,
+        advance_batches: null,
+        created_at: now,
+        updated_at: now,
+      },
+    ];
+    dbStore.attachRemote(backend);
+
+    await dbStore.hydrateFromRemote("farm-1");
+    await flush();
+
+    const lastTaskPush = backend.upserts.filter((u) => u.table === "farm_tasks").pop()!;
+    const row = lastTaskPush.rows.find((r) => r.id === "task-null-cols")!;
+    expect(row.worker_ids).toEqual([]);
+    expect(row.worker_wages).toEqual({});
+    expect(row.worker_advances).toEqual({});
+    expect(row.advance_amount).toBe(0);
+    expect(row.advance_batches).toEqual([]);
+  });
+
+  it("pushes farm_tasks before task-linked financial_records", async () => {
+    const backend = new FakeBackend("farm-1");
+    dbStore.attachRemote(backend);
+
+    dbStore.saveTask({
+      farm_id: "farm-1",
+      worker_id: "wrk-1",
+      title: "Récolte cacao",
+      wage_amount: 3500,
+      status: "completed",
+      wage_paid: true,
+    });
+    await flush();
+
+    const farmTasksAt = backend.upserts.findIndex((u) => u.table === "farm_tasks");
+    const financialsAt = backend.upserts.findIndex((u) => u.table === "financial_records");
+    expect(farmTasksAt).toBeGreaterThanOrEqual(0);
+    expect(financialsAt).toBeGreaterThan(farmTasksAt);
   });
 });
