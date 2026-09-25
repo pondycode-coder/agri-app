@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { MobileListContainer, MobileListItem, MobileEmptyState } from '@/components/MobileList';
+import { PageHeader } from '@/components/PageHeader';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -259,19 +261,12 @@ export default function SaasAdmin() {
   return (
     <MainLayout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between flex-wrap gap-3">
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <ShieldCheck className="h-6 w-6 text-amber-500" />
-              {t('saas.title')}
-            </h1>
-            <p className="text-sm text-slate-500 mt-1">{t('saas.subtitle')}</p>
-          </div>
-          <Button variant="outline" onClick={() => void load()} disabled={loading}>
+        <PageHeader icon={ShieldCheck} title={t('saas.title')} subtitle={t('saas.subtitle')}>
+          <Button variant="outline" onClick={() => void load()} disabled={loading} className="w-full sm:w-auto">
             <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
             {t('saas.refresh')}
           </Button>
-        </div>
+        </PageHeader>
 
         {!isSupabaseConfigured() && (
           <Card className="border-amber-300 bg-amber-50 dark:bg-amber-950/30">
@@ -282,7 +277,7 @@ export default function SaasAdmin() {
         )}
 
         {/* Platform stats */}
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+        <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-3 sm:gap-4">
           {statCards.map(({ label, value, icon: Icon }) => (
             <Card key={label}>
               <CardContent className="pt-5 space-y-1">
@@ -295,7 +290,7 @@ export default function SaasAdmin() {
         </div>
 
         <Tabs defaultValue="farms">
-          <TabsList>
+          <TabsList className="w-full justify-start overflow-x-auto">
             <TabsTrigger value="farms">{t('saas.tabFarms')} ({farms.length})</TabsTrigger>
             <TabsTrigger value="users">{t('saas.tabUsers')} ({users.length})</TabsTrigger>
             <TabsTrigger value="activity">{t('saas.tabActivity')} ({events.length})</TabsTrigger>
@@ -305,6 +300,7 @@ export default function SaasAdmin() {
           <TabsContent value="farms" className="space-y-4">
             <Card>
               <CardContent className="pt-6">
+                <div className="hidden md:block">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -366,6 +362,27 @@ export default function SaasAdmin() {
                     )}
                   </TableBody>
                 </Table>
+                </div>
+                <MobileListContainer>
+                  {farms.map((farm) => (
+                    <MobileListItem key={farm.id} onDelete={() => void handleDeleteFarm(farm.id)}>
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="font-semibold text-sm text-slate-800 dark:text-slate-200 truncate">{farm.name}</p>
+                        <span className="shrink-0 text-xs text-slate-400">{new Date(farm.created_at).toLocaleDateString(localeTag)}</span>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-0.5 truncate">{farm.location || '—'}</p>
+                      <div className="flex flex-wrap items-center gap-1.5 pt-1.5 text-xs">
+                        <Badge variant="secondary">{farm.size_in_hectares} ha · {farm.plots} {t('saas.farmColPlots').toLowerCase()}</Badge>
+                        <Badge variant="secondary">{farm.users_count} {t('saas.farmColMembers').toLowerCase()}</Badge>
+                      </div>
+                      <div className="flex items-center gap-3 pt-1.5 text-xs">
+                        <span className="text-emerald-700 dark:text-emerald-400">↗ {formatFCFA(farm.total_income)}</span>
+                        <span className="text-rose-700 dark:text-rose-400">↘ {formatFCFA(farm.total_expenses)}</span>
+                      </div>
+                    </MobileListItem>
+                  ))}
+                </MobileListContainer>
+                {farms.length === 0 && <MobileEmptyState message={t('saas.emptyFarms')} />}
               </CardContent>
             </Card>
           </TabsContent>
@@ -373,6 +390,7 @@ export default function SaasAdmin() {
           <TabsContent value="users" className="space-y-4">
             <Card>
               <CardContent className="pt-6">
+                <div className="hidden md:block">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -466,6 +484,81 @@ export default function SaasAdmin() {
                     )}
                   </TableBody>
                 </Table>
+                </div>
+                <MobileListContainer>
+                  {users.map((u) => (
+                    <div key={u.id} className="py-3.5 px-4">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="font-semibold text-sm text-slate-800 dark:text-slate-200 truncate">{u.name || '—'}</p>
+                          <p className="text-xs text-slate-500 truncate">{u.email}</p>
+                        </div>
+                        <div className="flex flex-col items-end gap-1 shrink-0">
+                          {u.is_superadmin && (
+                            <Badge className="bg-amber-500 hover:bg-amber-500 text-white">{t('saas.superadmin')}</Badge>
+                          )}
+                          <span className="text-xs text-slate-400">{new Date(u.created_at).toLocaleDateString(localeTag)}</span>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2 pt-2">
+                        <Select value={u.role} onValueChange={(v) => void handleRoleChange(u.id, v as AppRole)} disabled={busy}>
+                          <SelectTrigger className="w-32 h-8 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="admin">{t('saas.roleAdmin')}</SelectItem>
+                            <SelectItem value="manager">{t('saas.roleManager')}</SelectItem>
+                            <SelectItem value="worker">{t('saas.roleWorker')}</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <Select
+                          value={u.farm_id || 'none'}
+                          onValueChange={(v) => v !== 'none' && void handleMoveUser(u.id, v)}
+                          disabled={busy}
+                        >
+                          <SelectTrigger className="w-44 h-8 text-xs">
+                            <SelectValue placeholder={u.farm_name || t('saas.noFarm')} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none" disabled>
+                              {u.farm_name || t('saas.noFarm')}
+                            </SelectItem>
+                            {farms
+                              .filter((f) => f.id !== u.farm_id)
+                              .map((f) => (
+                                <SelectItem key={f.id} value={f.id}>
+                                  {f.name}
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2 pt-2">
+                        <Button
+                          size="sm"
+                          variant={u.is_superadmin ? 'default' : 'outline'}
+                          className={u.is_superadmin ? 'bg-amber-500 hover:bg-amber-600 text-white' : ''}
+                          onClick={() => void handleSuperadminToggle(u)}
+                          disabled={busy}
+                        >
+                          {u.is_superadmin ? <Check className="h-3.5 w-3.5 mr-1.5" /> : <Ban className="h-3.5 w-3.5 mr-1.5" />}
+                          {u.is_superadmin ? t('saas.superadmin') : t('saas.promote')}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={u.pin ? 'ghost' : 'outline'}
+                          className="h-8 text-xs"
+                          onClick={() => openPinDialog(u.id, u.name || u.email)}
+                          disabled={busy}
+                        >
+                          {u.pin ? <Edit3 className="h-3.5 w-3.5 mr-1" /> : <Key className="h-3.5 w-3.5 mr-1" />}
+                          {u.pin ? `${t('saas.editPin')} · ${u.pin}` : t('saas.setPin')}
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </MobileListContainer>
+                {users.length === 0 && <MobileEmptyState message={t('saas.emptyUsers')} />}
               </CardContent>
             </Card>
           </TabsContent>
@@ -473,6 +566,7 @@ export default function SaasAdmin() {
           <TabsContent value="activity" className="space-y-4">
             <Card>
               <CardContent className="pt-6">
+                <div className="hidden md:block">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -515,6 +609,33 @@ export default function SaasAdmin() {
                     )}
                   </TableBody>
                 </Table>
+                </div>
+                <MobileListContainer>
+                  {events.map((ev) => (
+                    <div key={ev.id} className="py-3.5 px-4">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="font-semibold text-sm text-slate-800 dark:text-slate-200 truncate">{ev.user_name || '—'}</p>
+                          <p className="text-xs text-slate-500 truncate">{ev.user_email}</p>
+                        </div>
+                        {ev.event_type === 'login' ? (
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 shrink-0">
+                            <LogIn className="h-3.5 w-3.5" /> {t('saas.eventLogin')}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-100 px-2 py-0.5 text-xs font-medium text-rose-700 shrink-0">
+                            <LogOut className="h-3.5 w-3.5" /> {t('saas.eventLogout')}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-3 pt-1 text-xs text-slate-500">
+                        <span className="truncate">{ev.farm_name || '—'}</span>
+                        <span className="text-slate-400 whitespace-nowrap">{new Date(ev.created_at).toLocaleString(localeTag)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </MobileListContainer>
+                {events.length === 0 && <MobileEmptyState message={t('saas.emptyActivity')} />}
               </CardContent>
             </Card>
           </TabsContent>
