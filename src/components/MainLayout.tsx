@@ -396,13 +396,11 @@ export const MainLayout = ({ children }: { children: React.ReactNode }) => {
           })}
           <button
             type="button"
-            onClick={() => setMobileMenuOpen((o) => !o)}
-            className={`flex flex-col items-center gap-1 py-2.5 text-[10px] font-medium leading-none ${
-              mobileMenuOpen ? 'text-emerald-600' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
-            }`}
+            onClick={signOut}
+            className="flex flex-col items-center gap-1 py-2.5 text-[10px] font-medium leading-none text-slate-500 hover:text-red-600 focus:outline-none"
           >
-            {mobileMenuOpen ? <X className="h-5 w-5 text-emerald-600" /> : <Menu className="h-5 w-5 text-slate-400" />}
-            Menu
+            <LogOut className="h-5 w-5 text-slate-400" />
+            {t('layout.header.signOut')}
           </button>
         </div>
       </nav>
