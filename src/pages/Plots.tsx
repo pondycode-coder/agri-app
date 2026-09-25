@@ -12,6 +12,8 @@ import { Plot } from '@/types/database';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { MobileListContainer, MobileListItem, MobileEmptyState } from '@/components/MobileList';
+import { PageHeader } from '@/components/PageHeader';
 import { Grid as GridIcon, Plus, Pencil, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Pagination, PAGE_SIZE, clampPage } from '@/components/Pagination';
@@ -70,10 +72,14 @@ export default function Plots() {
 
   const handleDelete = () => {
     if (deleteId) {
-      dbStore.deletePlot(deleteId);
-      setDeleteId(null);
-      toast({ title: t('common.successDeleted') });
+      doDelete(deleteId);
     }
+  };
+
+  const doDelete = (id: string) => {
+    dbStore.deletePlot(id);
+    setDeleteId(null);
+    toast({ title: t('common.successDeleted') });
   };
 
   const getFarmName = (farmId: string) => farms.find((f) => f.id === farmId)?.name || '—';
@@ -86,22 +92,16 @@ export default function Plots() {
   return (
     <MainLayout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <GridIcon className="h-6 w-6 text-emerald-600" />
-              {t('plots.title')}
-            </h1>
-            <p className="text-sm text-slate-500 mt-1">{t('plots.subtitle')}</p>
-          </div>
-          <Button onClick={openCreate} className="bg-emerald-600 hover:bg-emerald-700">
+        <PageHeader icon={GridIcon} title={t('plots.title')} subtitle={t('plots.subtitle')}>
+          <Button onClick={openCreate} className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700">
             <Plus className="h-4 w-4 mr-2" />
             {t('plots.addPlot')}
           </Button>
-        </div>
+        </PageHeader>
 
         <Card>
           <CardContent className="p-0">
+            <div className="hidden md:block">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -153,6 +153,22 @@ export default function Plots() {
                 )}
               </TableBody>
             </Table>
+            </div>
+            <MobileListContainer>
+              {paginatedPlots.map((plot) => (
+                <MobileListItem key={plot.id} onEdit={() => openEdit(plot)} onDelete={() => doDelete(plot.id)}>
+                  <p className="font-semibold text-sm text-slate-800 dark:text-slate-200 truncate">{plot.name}</p>
+                  <p className="text-sm text-slate-500 truncate">{getFarmName(plot.farm_id)}</p>
+                  <div className="flex flex-wrap items-center gap-1.5 pt-1 text-xs text-slate-500">
+                    <span>{plot.size_in_hectares} ha</span>
+                    <span className="text-slate-300">·</span>
+                    <span>{plot.soil_type}</span>
+                    <Badge className={statusColors[plot.status] || ''}>{statusLabel(plot.status)}</Badge>
+                  </div>
+                </MobileListItem>
+              ))}
+            </MobileListContainer>
+            {paginatedPlots.length === 0 && <MobileEmptyState message={t('common.noData')} />}
             <Pagination total={plots.length} page={cp} onPageChange={setPage} />
           </CardContent>
         </Card>

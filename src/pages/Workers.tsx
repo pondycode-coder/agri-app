@@ -13,6 +13,8 @@ import { Worker } from '@/types/database';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { MobileListContainer, MobileListItem, MobileEmptyState } from '@/components/MobileList';
+import { PageHeader } from '@/components/PageHeader';
 import { Users, Plus, Pencil, Trash2, Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Pagination, PAGE_SIZE, clampPage } from '@/components/Pagination';
@@ -68,7 +70,13 @@ export default function Workers() {
   };
 
   const handleDelete = () => {
-    if (deleteId) { dbStore.deleteWorker(deleteId); setDeleteId(null); toast({ title: t('common.successDeleted') }); }
+    if (deleteId) { doDelete(deleteId); }
+  };
+
+  const doDelete = (id: string) => {
+    dbStore.deleteWorker(id);
+    setDeleteId(null);
+    toast({ title: t('common.successDeleted') });
   };
 
   const handleToggleActive = (w: Worker) => {
@@ -94,13 +102,9 @@ export default function Workers() {
   return (
     <MainLayout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2"><Users className="h-6 w-6 text-emerald-600" />{t('workers.title')}</h1>
-            <p className="text-sm text-slate-500 mt-1">{t('workers.subtitle')}</p>
-          </div>
-          <Button onClick={openCreate} className="bg-emerald-600 hover:bg-emerald-700"><Plus className="h-4 w-4 mr-2" />{t('workers.addWorker')}</Button>
-        </div>
+        <PageHeader icon={Users} title={t('workers.title')} subtitle={t('workers.subtitle')}>
+          <Button onClick={openCreate} className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700"><Plus className="h-4 w-4 mr-2" />{t('workers.addWorker')}</Button>
+        </PageHeader>
 
         <Card>
           <CardContent className="p-0">
@@ -132,6 +136,7 @@ export default function Workers() {
                 </Select>
               </div>
             </div>
+            <div className="hidden md:block">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -175,6 +180,25 @@ export default function Workers() {
                 ))}
               </TableBody>
             </Table>
+            </div>
+            <MobileListContainer>
+              {paginatedWorkers.map((w) => (
+                <MobileListItem key={w.id} onEdit={() => openEdit(w)} onDelete={() => doDelete(w.id)}>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="font-semibold text-sm text-slate-800 dark:text-slate-200 truncate">{w.name}</p>
+                    <Badge className={w.is_active ? 'bg-emerald-100 text-emerald-800 shrink-0' : 'bg-slate-100 text-slate-600 shrink-0'}>
+                      {w.is_active ? t('workers.active') : t('workers.inactive')}
+                    </Badge>
+                  </div>
+                  <p className="text-sm text-slate-500 truncate">{w.phone_number || '—'}</p>
+                  <div className="flex flex-wrap items-center gap-1.5 pt-1 text-xs text-slate-500">
+                    <Badge variant="secondary">{roleLabels[w.role] || w.role}</Badge>
+                    <span>{w.total_tasks_completed} tâches terminées</span>
+                  </div>
+                </MobileListItem>
+              ))}
+            </MobileListContainer>
+            {paginatedWorkers.length === 0 && <MobileEmptyState message={t('common.noData')} />}
             <Pagination total={filteredWorkers.length} page={cp} onPageChange={setPage} />
           </CardContent>
         </Card>

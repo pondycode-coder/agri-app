@@ -99,6 +99,16 @@ export const MainLayout = ({ children }: { children: React.ReactNode }) => {
 
   const currentRole = effectiveRole || user?.role;
 
+  // Most-used sections for one-thumb access; everything else lives in the drawer.
+  const mobileNavItems = [
+    { path: '/dashboard', icon: LayoutDashboard, label: 'Accueil', resource: 'dashboard' as const },
+    { path: '/dashboard/tasks', icon: CheckSquare, label: 'Tâches', resource: 'tasks' as const },
+    { path: '/dashboard/financials', icon: Receipt, label: 'Finances', resource: 'financials' as const },
+    { path: '/dashboard/workers', icon: Users, label: 'Ouvriers', resource: 'workers' as const },
+  ].filter((item) =>
+    item.resource === 'dashboard' ? true : hasPermission(currentRole, 'view', item.resource as Resource),
+  );
+
   const handleCreateFarm = async () => {
     if (!createForm.name.trim()) {
       toast({ title: 'Nom requis', variant: 'destructive' });
@@ -167,6 +177,11 @@ export const MainLayout = ({ children }: { children: React.ReactNode }) => {
           {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
         </Button>
       </div>
+
+      {/* Mobile drawer backdrop */}
+      {mobileMenuOpen && (
+        <div className="fixed inset-0 z-30 bg-black/50 md:hidden" onClick={() => setMobileMenuOpen(false)} aria-hidden="true" />
+      )}
 
       {/* Sidebar Navigation */}
       <aside
@@ -353,11 +368,44 @@ export const MainLayout = ({ children }: { children: React.ReactNode }) => {
         </header>
 
         {/* Page Container */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
+        <main className="flex-1 px-4 py-4 sm:p-6 lg:p-8 pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:pb-8 max-w-7xl w-full mx-auto">
           <SyncStatusBar />
           {children}
         </main>
       </div>
+
+      {/* Mobile Bottom Navigation */}
+      <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 pb-[env(safe-area-inset-bottom)] shadow-[0_-2px_12px_rgba(0,0,0,0.06)]">
+        <div className="grid grid-cols-5 max-w-lg mx-auto">
+          {mobileNavItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = location.pathname === item.path;
+            return (
+              <Link
+                key={item.path}
+                to={item.path}
+                onClick={() => setMobileMenuOpen(false)}
+                className={`flex flex-col items-center gap-1 py-2.5 text-[10px] font-medium leading-none ${
+                  isActive ? 'text-emerald-600' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                }`}
+              >
+                <Icon className={`h-5 w-5 ${isActive ? 'text-emerald-600' : 'text-slate-400'}`} />
+                {item.label}
+              </Link>
+            );
+          })}
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen((o) => !o)}
+            className={`flex flex-col items-center gap-1 py-2.5 text-[10px] font-medium leading-none ${
+              mobileMenuOpen ? 'text-emerald-600' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+            }`}
+          >
+            {mobileMenuOpen ? <X className="h-5 w-5 text-emerald-600" /> : <Menu className="h-5 w-5 text-slate-400" />}
+            Menu
+          </button>
+        </div>
+      </nav>
 
       {/* Create Farm Dialog */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>

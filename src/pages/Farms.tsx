@@ -12,6 +12,8 @@ import { Farm } from '@/types/database';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { MobileListContainer, MobileListItem, MobileEmptyState } from '@/components/MobileList';
+import { PageHeader } from '@/components/PageHeader';
 import { Tractor, Plus, Pencil, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Pagination, PAGE_SIZE, clampPage } from '@/components/Pagination';
@@ -59,31 +61,29 @@ export default function Farms() {
 
   const handleDelete = () => {
     if (deleteId) {
-      dbStore.deleteFarm(deleteId);
-      setDeleteId(null);
-      toast({ title: t('common.successDeleted') });
+      doDelete(deleteId);
     }
+  };
+
+  const doDelete = (id: string) => {
+    dbStore.deleteFarm(id);
+    setDeleteId(null);
+    toast({ title: t('common.successDeleted') });
   };
 
   return (
     <MainLayout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <Tractor className="h-6 w-6 text-emerald-600" />
-              {t('farms.title')}
-            </h1>
-            <p className="text-sm text-slate-500 mt-1">{t('farms.subtitle')}</p>
-          </div>
-          <Button onClick={openCreate} className="bg-emerald-600 hover:bg-emerald-700">
+        <PageHeader icon={Tractor} title={t('farms.title')} subtitle={t('farms.subtitle')}>
+          <Button onClick={openCreate} className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700">
             <Plus className="h-4 w-4 mr-2" />
             {t('farms.addFarm')}
           </Button>
-        </div>
+        </PageHeader>
 
         <Card>
           <CardContent className="p-0">
+            <div className="hidden md:block">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -133,6 +133,20 @@ export default function Farms() {
                 )}
               </TableBody>
             </Table>
+            </div>
+            <MobileListContainer>
+              {paginatedFarms.map((farm) => (
+                <MobileListItem key={farm.id} onEdit={() => openEdit(farm)} onDelete={() => doDelete(farm.id)}>
+                  <p className="font-semibold text-sm text-slate-800 dark:text-slate-200 truncate">{farm.name}</p>
+                  <p className="text-sm text-slate-500 truncate">{farm.location || '—'}</p>
+                  <div className="flex flex-wrap items-center gap-1.5 pt-1 text-xs text-slate-500">
+                    <Badge variant="secondary">{farm.plots} parcelle{farm.plots > 1 ? 's' : ''}</Badge>
+                    <span>{farm.size_in_hectares} ha</span>
+                  </div>
+                </MobileListItem>
+              ))}
+            </MobileListContainer>
+            {paginatedFarms.length === 0 && <MobileEmptyState message={t('common.noData')} />}
             <Pagination total={farms.length} page={cp} onPageChange={setPage} />
           </CardContent>
         </Card>

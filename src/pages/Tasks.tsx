@@ -15,6 +15,8 @@ import { FarmTask, TaskAdvanceBatch } from '@/types/database';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { MobileListContainer, MobileListItem, MobileEmptyState } from '@/components/MobileList';
+import { PageHeader } from '@/components/PageHeader';
 import { CheckSquare, Plus, Pencil, Trash2, ChevronDown, Search, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Pagination, PAGE_SIZE, clampPage } from '@/components/Pagination';
@@ -176,7 +178,13 @@ export default function Tasks() {
   };
 
   const handleDelete = () => {
-    if (deleteId) { dbStore.deleteTask(deleteId); setDeleteId(null); toast({ title: t('common.successDeleted') }); }
+    if (deleteId) { doDelete(deleteId); }
+  };
+
+  const doDelete = (id: string) => {
+    dbStore.deleteTask(id);
+    setDeleteId(null);
+    toast({ title: t('common.successDeleted') });
   };
 
   const statusLabel = (s: string) => {
@@ -222,13 +230,9 @@ export default function Tasks() {
   return (
     <MainLayout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2"><CheckSquare className="h-6 w-6 text-emerald-600" />{t('tasks.title')}</h1>
-            <p className="text-sm text-slate-500 mt-1">{t('tasks.subtitle')}</p>
-          </div>
-          <Button onClick={openCreate} className="bg-emerald-600 hover:bg-emerald-700"><Plus className="h-4 w-4 mr-2" />{t('tasks.addTask')}</Button>
-        </div>
+        <PageHeader icon={CheckSquare} title={t('tasks.title')} subtitle={t('tasks.subtitle')}>
+          <Button onClick={openCreate} className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700"><Plus className="h-4 w-4 mr-2" />{t('tasks.addTask')}</Button>
+        </PageHeader>
 
         <Card>
           <CardContent className="p-0">
@@ -268,6 +272,7 @@ export default function Tasks() {
                 )}
               </div>
             </div>
+            <div className="hidden md:block">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -370,6 +375,81 @@ export default function Tasks() {
                 })}
               </TableBody>
             </Table>
+            </div>
+            <MobileListContainer>
+              {paginatedTasks.map((task) => {
+                const batches = getAdvanceBatches(task);
+                const isExpanded = expandedTaskId === task.id;
+                return (
+                  <MobileListItem key={task.id} onEdit={() => openEdit(task)} onDelete={() => doDelete(task.id)}>
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="font-semibold text-sm text-slate-800 dark:text-slate-200 truncate">{task.title}</p>
+                      <Badge className={`shrink-0 ${statusColors[task.status] || ''}`}>{statusLabel(task.status)}</Badge>
+                    </div>
+                    <div className="space-y-0.5 pt-1">
+                      {getWorkerWageBreakdown(task).length === 0 ? (
+                        <span className="text-sm text-slate-400">—</span>
+                      ) : (
+                        getWorkerWageBreakdown(task).map(({ id, name, wage, advance }) => (
+                          <div key={id} className="flex items-center justify-between gap-3 text-sm">
+                            <span className="truncate text-slate-700">{name}</span>
+                            <span className="flex items-center gap-2 text-slate-500 shrink-0">
+                              {advance > 0 && <span className="text-amber-600">(-{formatFCFA(advance)})</span>}
+                              <span>{formatFCFA(wage)}</span>
+                            </span>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 pt-1.5 text-xs text-slate-500">
+                      <span>{getPlotName(task.plot_id)}</span>
+                      {task.due_date && (
+                        <><span className="text-slate-300">·</span><span>{task.due_date}</span></>
+                      )}
+                      <Badge className={task.wage_paid ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}>
+                        {task.wage_paid ? t('tasks.paid') : t('tasks.unpaid')}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center justify-between gap-2 pt-2">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-1.5 text-xs text-slate-600"
+                        onClick={() => setExpandedTaskId(isExpanded ? null : task.id)}
+                      >
+                        <ChevronDown className={`h-3.5 w-3.5 mr-1 transition-transform ${isExpanded ? '' : '-rotate-90'}`} />
+                        {t('tasks.advances')}
+                      </Button>
+                      <span className="text-xs text-slate-500">
+                        {t('tasks.netToPay')} : <span className="font-semibold text-emerald-700">{formatFCFA(Math.max(0, (task.wage_amount ?? 0) - (task.advance_amount ?? 0)))}</span>
+                      </span>
+                    </div>
+                    {isExpanded && (
+                      <div className="mt-2 space-y-1.5 rounded-md border border-slate-200 bg-slate-50 p-2 dark:border-slate-700 dark:bg-slate-900/40">
+                        {batches.length === 0 ? (
+                          <p className="text-sm text-slate-400">{t('tasks.noAdvances')}</p>
+                        ) : (
+                          batches.map((b) => (
+                            <div key={b.id} className="flex items-center justify-between text-sm">
+                              <span className="text-xs text-slate-500">{b.date || '—'}</span>
+                              <span>
+                                {Object.entries(b.amounts).map(([wid, amt]) => (
+                                  <span key={wid} className="text-slate-600">
+                                    {getWorkerName(wid)}{Number(amt) > 0 ? ` : ${formatFCFA(Number(amt))}` : ''}
+                                  </span>
+                                ))}
+                              </span>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    )}
+                  </MobileListItem>
+                );
+              })}
+            </MobileListContainer>
+            {paginatedTasks.length === 0 && <MobileEmptyState message={t('common.noData')} />}
             <Pagination total={filteredTasks.length} page={cp} onPageChange={setPage} />
           </CardContent>
         </Card>

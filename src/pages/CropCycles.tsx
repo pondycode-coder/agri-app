@@ -13,6 +13,8 @@ import { formatFCFA } from '@/types/database';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { MobileListContainer, MobileListItem, MobileEmptyState } from '@/components/MobileList';
+import { PageHeader } from '@/components/PageHeader';
 import { Sprout, Plus, Pencil, Trash2, Search, Timer, TrendingUp, LandPlot, Wallet, ChevronRight, ChevronDown, StickyNote } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Pagination, PAGE_SIZE, clampPage } from '@/components/Pagination';
@@ -169,11 +171,15 @@ export default function CropCycles() {
 
   const handleDeleteCycle = () => {
     if (deleteId) {
-      cycleHarvests(deleteId).forEach((h) => dbStore.deleteHarvest(h.id));
-      dbStore.deleteCropCycle(deleteId);
-      setDeleteId(null);
-      toast({ title: t('common.successDeleted') });
+      doDeleteCycle(deleteId);
     }
+  };
+
+  const doDeleteCycle = (id: string) => {
+    cycleHarvests(id).forEach((h) => dbStore.deleteHarvest(h.id));
+    dbStore.deleteCropCycle(id);
+    setDeleteId(null);
+    toast({ title: t('common.successDeleted') });
   };
 
   const handleDeleteHarvest = (id: string) => {
@@ -196,13 +202,9 @@ export default function CropCycles() {
   return (
     <MainLayout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2"><Sprout className="h-6 w-6 text-emerald-600" />{t('crops.title')}</h1>
-            <p className="text-sm text-slate-500 mt-1">{t('crops.subtitle')}</p>
-          </div>
-          <Button onClick={openCreate} className="bg-emerald-600 hover:bg-emerald-700"><Plus className="h-4 w-4 mr-2" />{t('crops.addCrop')}</Button>
-        </div>
+        <PageHeader icon={Sprout} title={t('crops.title')} subtitle={t('crops.subtitle')}>
+          <Button onClick={openCreate} className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700"><Plus className="h-4 w-4 mr-2" />{t('crops.addCrop')}</Button>
+        </PageHeader>
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {kpiCards.map(({ label, value, icon: Icon, accent }) => (
@@ -240,6 +242,7 @@ export default function CropCycles() {
                 </SelectContent>
               </Select>
             </div>
+            <div className="hidden md:block">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -372,6 +375,49 @@ export default function CropCycles() {
                 })}
               </TableBody>
             </Table>
+            </div>
+            <MobileListContainer>
+              {paginatedCrops.map((crop) => {
+                const ts = totals(crop);
+                const unitsList = Object.entries(ts.units).filter(([, q]) => q > 0);
+                return (
+                  <MobileListItem
+                    key={crop.id}
+                    onEdit={() => openEdit(crop)}
+                    onDelete={() => doDeleteCycle(crop.id)}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="font-semibold text-sm text-slate-800 dark:text-slate-200 truncate">{crop.crop_name}</p>
+                      <Badge className={`shrink-0 ${statusColors[crop.status] || ''}`}>{statusLabel(crop.status)}</Badge>
+                    </div>
+                    <p className="text-sm text-slate-500 truncate">
+                      {[crop.variety, crop.season].filter(Boolean).join(' · ') || plotById(crop.plot_id)?.name || '—'}
+                    </p>
+                    <div className="flex flex-wrap items-center gap-1.5 pt-1 text-xs text-slate-500">
+                      <span>{plotById(crop.plot_id)?.name || '—'}</span>
+                      {isOverdue(crop) && (
+                        <Badge className="bg-red-100 text-red-700"><Timer className="h-3 w-3 mr-1" />{t('crops.overdue')}</Badge>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-1.5 text-xs">
+                      <span className="text-slate-500">Planté le {crop.planting_date}</span>
+                      {crop.status === 'harvested' ? (
+                        <span className="text-emerald-700 font-medium">{ts.revenue > 0 ? `Revenu : ${formatFCFA(ts.revenue)}` : unitsList.map(([u, q]) => `${q} ${yieldUnitLabel(u)}`).join(', ') || (ts.latestDate || 'récolté')}</span>
+                      ) : (
+                        <span className="text-slate-500">{crop.expected_harvest_date ? `Récolte prévue : ${crop.expected_harvest_date}` : ''}</span>
+                      )}
+                      <span className="text-slate-500">Coût : {formatFCFA(crop.estimated_cost_fcfa)}</span>
+                    </div>
+                    <div className="pt-2">
+                      <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => openHarvestDialog(crop)}>
+                        <Sprout className="h-3.5 w-3.5 mr-1 text-emerald-600" />{t('crops.harvestBtn')}
+                      </Button>
+                    </div>
+                  </MobileListItem>
+                );
+              })}
+            </MobileListContainer>
+            {paginatedCrops.length === 0 && <MobileEmptyState message={t('common.noData')} />}
             <Pagination total={sortedCrops.length} page={cp} onPageChange={setPage} />
           </CardContent>
         </Card>

@@ -113,7 +113,7 @@ export default function Dashboard() {
     <MainLayout>
       <div className="space-y-6">
         {/* Banner */}
-        <div className="bg-gradient-to-r from-emerald-800 via-emerald-700 to-teal-800 rounded-2xl p-6 text-white shadow-xl relative overflow-hidden">
+        <div className="bg-gradient-to-r from-emerald-800 via-emerald-700 to-teal-800 rounded-2xl p-5 sm:p-6 text-white shadow-xl relative overflow-hidden">
           <div className="absolute -right-10 -bottom-10 opacity-10 text-9xl select-none">
             🌾
           </div>
@@ -124,7 +124,7 @@ export default function Dashboard() {
               </Badge>
               <span className="text-xs text-emerald-200">Système de Gestion Agricole</span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
+            <h1 className="text-xl sm:text-3xl font-extrabold tracking-tight">
               {t('dashboard.welcome')}
             </h1>
             <p className="text-emerald-100 text-sm max-w-xl">
@@ -134,7 +134,7 @@ export default function Dashboard() {
         </div>
 
         {/* High Level Stat Cards Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           <Card className="border-l-4 border-l-emerald-500 shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
@@ -455,36 +455,55 @@ export default function Dashboard() {
               {workers.length === 0 ? (
                 <p className="text-sm text-slate-500 py-4 text-center">Aucun ouvrier enregistré.</p>
               ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Nom</TableHead>
-                        <TableHead>Rôle</TableHead>
-                        <TableHead>Téléphone</TableHead>
-                        <TableHead>Tâches</TableHead>
-                        <TableHead>Statut</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {workers.map((w) => (
-                        <TableRow key={w.id}>
-                          <TableCell className="font-medium text-slate-800 dark:text-slate-200">{w.name}</TableCell>
-                          <TableCell>
+                <>
+                  <div className="hidden md:block overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Nom</TableHead>
+                          <TableHead>Rôle</TableHead>
+                          <TableHead>Téléphone</TableHead>
+                          <TableHead>Tâches</TableHead>
+                          <TableHead>Statut</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {workers.map((w) => (
+                          <TableRow key={w.id}>
+                            <TableCell className="font-medium text-slate-800 dark:text-slate-200">{w.name}</TableCell>
+                            <TableCell>
+                              <Badge variant="secondary">{roleLabels[w.role] || w.role}</Badge>
+                            </TableCell>
+                            <TableCell className="text-slate-500">{w.phone_number}</TableCell>
+                            <TableCell className="text-slate-500">{w.total_tasks_completed}</TableCell>
+                            <TableCell>
+                              <Badge className={w.is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}>
+                                {w.is_active ? 'Actif' : 'Inactif'}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800">
+                    {workers.map((w) => (
+                      <div key={w.id} className="flex items-center justify-between gap-3 py-3">
+                        <div className="min-w-0 space-y-0.5">
+                          <p className="font-semibold text-sm text-slate-800 dark:text-slate-200 truncate">{w.name}</p>
+                          <p className="text-xs text-slate-500 truncate">{w.phone_number || '—'}</p>
+                          <div className="flex items-center gap-1.5 pt-0.5">
                             <Badge variant="secondary">{roleLabels[w.role] || w.role}</Badge>
-                          </TableCell>
-                          <TableCell className="text-slate-500">{w.phone_number}</TableCell>
-                          <TableCell className="text-slate-500">{w.total_tasks_completed}</TableCell>
-                          <TableCell>
                             <Badge className={w.is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}>
                               {w.is_active ? 'Actif' : 'Inactif'}
                             </Badge>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
+                          </div>
+                        </div>
+                        <span className="text-xs font-semibold text-slate-500">{w.total_tasks_completed} tâches</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
               )}
             </CardContent>
           </Card>

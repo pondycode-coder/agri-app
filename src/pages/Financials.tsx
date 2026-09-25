@@ -14,6 +14,8 @@ import { formatFCFA } from '@/types/database';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { MobileListContainer, MobileListItem, MobileEmptyState } from '@/components/MobileList';
+import { PageHeader } from '@/components/PageHeader';
 import { Receipt, Plus, Pencil, Trash2, TrendingUp, TrendingDown, Landmark, Filter, Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Pagination, PAGE_SIZE, clampPage } from '@/components/Pagination';
@@ -137,7 +139,13 @@ export default function Financials() {
   };
 
   const handleDelete = () => {
-    if (deleteId) { dbStore.deleteFinancialRecord(deleteId); setDeleteId(null); toast({ title: t('common.successDeleted') }); }
+    if (deleteId) { doDelete(deleteId); }
+  };
+
+  const doDelete = (id: string) => {
+    dbStore.deleteFinancialRecord(id);
+    setDeleteId(null);
+    toast({ title: t('common.successDeleted') });
   };
 
   const categories = categoryOptions(form.type);
@@ -152,13 +160,9 @@ export default function Financials() {
   return (
     <MainLayout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2"><Receipt className="h-6 w-6 text-emerald-600" />{t('financials.title')}</h1>
-            <p className="text-sm text-slate-500 mt-1">{t('financials.subtitle')}</p>
-          </div>
-          <Button onClick={openCreate} className="bg-emerald-600 hover:bg-emerald-700"><Plus className="h-4 w-4 mr-2" />{t('financials.addRecord')}</Button>
-        </div>
+        <PageHeader icon={Receipt} title={t('financials.title')} subtitle={t('financials.subtitle')}>
+          <Button onClick={openCreate} className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700"><Plus className="h-4 w-4 mr-2" />{t('financials.addRecord')}</Button>
+        </PageHeader>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {filtersActive && (
@@ -237,6 +241,7 @@ export default function Financials() {
               <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="w-40" title={t('financials.dateFrom')} />
               <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="w-40" title={t('financials.dateTo')} />
             </div>
+            <div className="hidden md:block">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -278,6 +283,28 @@ export default function Financials() {
                 ))}
               </TableBody>
             </Table>
+            </div>
+            <MobileListContainer>
+              {paginatedRecords.map((rec) => (
+                <MobileListItem key={rec.id} onEdit={() => openEdit(rec)} onDelete={() => doDelete(rec.id)}>
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="font-semibold text-sm text-slate-800 dark:text-slate-200 truncate">{rec.description || '—'}</p>
+                    <span className={`shrink-0 text-sm font-semibold ${rec.type === 'expense' ? 'text-rose-700' : rec.type === 'investment' ? 'text-indigo-700' : 'text-emerald-700'}`}>
+                      {rec.type === 'expense' ? '−' : '+'} {formatFCFA(rec.amount)}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1.5 pt-1 text-xs text-slate-500">
+                    <Badge className={rec.type === 'income' ? 'bg-emerald-100 text-emerald-800' : rec.type === 'investment' ? 'bg-indigo-100 text-indigo-800' : 'bg-rose-100 text-rose-800'}>
+                      {rec.type === 'income' ? t('financials.income') : rec.type === 'investment' ? t('financials.investment') : t('financials.expense')}
+                    </Badge>
+                    <Badge variant="secondary">{rec.category}</Badge>
+                    <span>{rec.date}</span>
+                    <span className="text-slate-400">{methodLabels[rec.payment_method] || rec.payment_method}</span>
+                  </div>
+                </MobileListItem>
+              ))}
+            </MobileListContainer>
+            {paginatedRecords.length === 0 && <MobileEmptyState message={t('common.noData')} />}
             <Pagination total={filteredRecords.length} page={cp} onPageChange={setPage} />
           </CardContent>
         </Card>

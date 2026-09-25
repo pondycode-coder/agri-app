@@ -13,6 +13,8 @@ import { formatFCFA } from '@/types/database';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { MobileListContainer, MobileListItem, MobileEmptyState } from '@/components/MobileList';
+import { PageHeader } from '@/components/PageHeader';
 import { Package, Plus, Pencil, Trash2, AlertTriangle, Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Pagination, PAGE_SIZE, clampPage } from '@/components/Pagination';
@@ -78,19 +80,21 @@ export default function Inventory() {
   };
 
   const handleDelete = () => {
-    if (deleteId) { dbStore.deleteInventoryItem(deleteId); setDeleteId(null); toast({ title: t('common.successDeleted') }); }
+    if (deleteId) { doDelete(deleteId); }
+  };
+
+  const doDelete = (id: string) => {
+    dbStore.deleteInventoryItem(id);
+    setDeleteId(null);
+    toast({ title: t('common.successDeleted') });
   };
 
   return (
     <MainLayout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2"><Package className="h-6 w-6 text-emerald-600" />{t('inventory.title')}</h1>
-            <p className="text-sm text-slate-500 mt-1">{t('inventory.subtitle')}</p>
-          </div>
-          <Button onClick={openCreate} className="bg-emerald-600 hover:bg-emerald-700"><Plus className="h-4 w-4 mr-2" />{t('inventory.addItem')}</Button>
-        </div>
+        <PageHeader icon={Package} title={t('inventory.title')} subtitle={t('inventory.subtitle')}>
+          <Button onClick={openCreate} className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700"><Plus className="h-4 w-4 mr-2" />{t('inventory.addItem')}</Button>
+        </PageHeader>
 
         {items.filter((i) => i.quantity <= 10).length > 0 && (
           <Card className="border-amber-300 bg-amber-50">
@@ -121,6 +125,7 @@ export default function Inventory() {
                 </SelectContent>
               </Select>
             </div>
+            <div className="hidden md:block">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -158,6 +163,29 @@ export default function Inventory() {
                 ))}
               </TableBody>
             </Table>
+            </div>
+            <MobileListContainer>
+              {paginatedItems.map((item) => (
+                <MobileListItem key={item.id} onEdit={() => openEdit(item)} onDelete={() => doDelete(item.id)}>
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="font-semibold text-sm text-slate-800 dark:text-slate-200 truncate">{item.name}</p>
+                    <Badge variant="secondary" className="shrink-0">{catLabels[item.category] || item.category}</Badge>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-1 text-xs text-slate-500">
+                    <span>{item.quantity} {item.unit}</span>
+                    <span className="text-slate-300">·</span>
+                    <span>{formatFCFA(item.price_per_unit)} / unité</span>
+                    <span className="font-medium text-slate-700">Valeur : {formatFCFA(item.quantity * item.price_per_unit)}</span>
+                  </div>
+                  {item.quantity <= 10 && (
+                    <p className="flex items-center gap-1 pt-1 text-xs font-medium text-amber-700">
+                      <AlertTriangle className="h-3 w-3" />Stock faible
+                    </p>
+                  )}
+                </MobileListItem>
+              ))}
+            </MobileListContainer>
+            {paginatedItems.length === 0 && <MobileEmptyState message={t('common.noData')} />}
             <Pagination total={filteredItems.length} page={cp} onPageChange={setPage} />
           </CardContent>
         </Card>
