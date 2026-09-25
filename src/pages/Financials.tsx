@@ -164,9 +164,9 @@ export default function Financials() {
           <Button onClick={openCreate} className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700"><Plus className="h-4 w-4 mr-2" />{t('financials.addRecord')}</Button>
         </PageHeader>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
           {filtersActive && (
-            <div className="md:col-span-4 -mb-2">
+            <div className="col-span-2 md:col-span-4 -mb-2">
               <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 border border-slate-300 px-2.5 py-0.5 text-[11px] font-medium text-slate-600">
                 <Filter className="h-3 w-3" />
                 {t('financials.filteredLabel')}
@@ -175,25 +175,25 @@ export default function Financials() {
           )}
           <Card className="bg-emerald-50 border-emerald-200">
             <CardContent className="p-4 flex items-center justify-between">
-              <div><p className="text-xs font-semibold text-emerald-800 uppercase">{t('financials.summaryIncome')}</p><p className="text-xl font-bold text-emerald-700 mt-1">{formatFCFA(totalIncome)}</p></div>
+              <div><p className="text-xs font-semibold text-emerald-800 uppercase">{t('financials.summaryIncome')}</p><p className="text-lg sm:text-xl font-bold text-emerald-700 mt-1">{formatFCFA(totalIncome)}</p></div>
               <TrendingUp className="h-6 w-6 text-emerald-600" />
             </CardContent>
           </Card>
           <Card className="bg-rose-50 border-rose-200">
             <CardContent className="p-4 flex items-center justify-between">
-              <div><p className="text-xs font-semibold text-rose-800 uppercase">{t('financials.summaryExpense')}</p><p className="text-xl font-bold text-rose-700 mt-1">{formatFCFA(totalExpense)}</p></div>
+              <div><p className="text-xs font-semibold text-rose-800 uppercase">{t('financials.summaryExpense')}</p><p className="text-lg sm:text-xl font-bold text-rose-700 mt-1">{formatFCFA(totalExpense)}</p></div>
               <TrendingDown className="h-6 w-6 text-rose-600" />
             </CardContent>
           </Card>
           <Card className="bg-indigo-50 border-indigo-200">
             <CardContent className="p-4 flex items-center justify-between">
-              <div><p className="text-xs font-semibold text-indigo-800 uppercase">{t('financials.summaryInvestment')}</p><p className="text-xl font-bold text-indigo-700 mt-1">{formatFCFA(totalInvestment)}</p></div>
+              <div><p className="text-xs font-semibold text-indigo-800 uppercase">{t('financials.summaryInvestment')}</p><p className="text-lg sm:text-xl font-bold text-indigo-700 mt-1">{formatFCFA(totalInvestment)}</p></div>
               <Landmark className="h-6 w-6 text-indigo-600" />
             </CardContent>
           </Card>
           <Card className={balance >= 0 ? 'bg-blue-50 border-blue-200' : 'bg-amber-50 border-amber-200'}>
             <CardContent className="p-4 flex items-center justify-between">
-              <div><p className="text-xs font-semibold uppercase">{t('financials.summaryBalance')}</p><p className={`text-xl font-bold mt-1 ${balance >= 0 ? 'text-blue-700' : 'text-amber-700'}`}>{formatFCFA(balance)}</p></div>
+              <div><p className="text-xs font-semibold uppercase">{t('financials.summaryBalance')}</p><p className={`text-lg sm:text-xl font-bold mt-1 ${balance >= 0 ? 'text-blue-700' : 'text-amber-700'}`}>{formatFCFA(balance)}</p></div>
               <Receipt className={`h-6 w-6 ${balance >= 0 ? 'text-blue-600' : 'text-amber-600'}`} />
             </CardContent>
           </Card>

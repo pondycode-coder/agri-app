@@ -206,7 +206,7 @@ export default function CropCycles() {
           <Button onClick={openCreate} className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700"><Plus className="h-4 w-4 mr-2" />{t('crops.addCrop')}</Button>
         </PageHeader>
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           {kpiCards.map(({ label, value, icon: Icon, accent }) => (
             <Card key={label}>
               <CardContent className="pt-5 space-y-1">
