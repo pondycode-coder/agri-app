@@ -25,7 +25,13 @@ export function SyncStatusBar() {
 
   return (
     <div className="mb-4 space-y-2">
-      {error && (
+      {!online && (
+        <div className="flex items-center gap-2 rounded-lg border border-blue-300 bg-blue-50 p-3 text-sm text-blue-800">
+          <WifiOff className="h-4 w-4 flex-shrink-0" />
+          <span>{t('sync.offline')}</span>
+        </div>
+      )}
+      {online && error && (
         <div className="flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
           <AlertTriangle className="h-4 w-4 flex-shrink-0" />
           <span className="flex-1">{error}</span>
@@ -38,12 +44,6 @@ export function SyncStatusBar() {
             <RefreshCw className="h-3 w-3 mr-1" />
             {t('sync.retry')}
           </Button>
-        </div>
-      )}
-      {!online && !error && (
-        <div className="flex items-center gap-2 rounded-lg border border-blue-300 bg-blue-50 p-3 text-sm text-blue-800">
-          <WifiOff className="h-4 w-4 flex-shrink-0" />
-          <span>{t('sync.offline')}</span>
         </div>
       )}
       {online && !error && syncing && (
