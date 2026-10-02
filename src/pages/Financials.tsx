@@ -16,7 +16,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { MobileListContainer, MobileListItem, MobileEmptyState } from '@/components/MobileList';
 import { PageHeader } from '@/components/PageHeader';
-import { Receipt, Plus, Pencil, Trash2, TrendingUp, TrendingDown, Landmark, Filter, Search } from 'lucide-react';
+import { Receipt, Plus, Pencil, Trash2, TrendingUp, TrendingDown, Landmark, Wallet, Filter, Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Pagination, PAGE_SIZE, clampPage } from '@/components/Pagination';
 
@@ -116,6 +116,10 @@ export default function Financials() {
   const totalInvestment = records.filter((r) => r.type === 'investment').reduce((s, r) => s + r.amount, 0);
   const totalExpense = filteredRecords.filter((r) => r.type === 'expense').reduce((s, r) => s + r.amount, 0);
   const balance = totalIncome + totalInvestment - totalExpense;
+  const totalNetToPay = dbStore
+    .getTasks()
+    .filter((task) => !task.wage_paid)
+    .reduce((s, task) => s + Math.max(0, (task.wage_amount ?? 0) - (task.advance_amount ?? 0)), 0);
 
   const filtersActive = !!search.trim() || typeFilter !== 'all' || categoryFilter !== 'all' || periodFilter !== 'all' || !!dateFrom || !!dateTo;
 
@@ -164,9 +168,9 @@ export default function Financials() {
           <Button onClick={openCreate} className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700"><Plus className="h-4 w-4 mr-2" />{t('financials.addRecord')}</Button>
         </PageHeader>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 sm:gap-4">
           {filtersActive && (
-            <div className="col-span-2 md:col-span-4 -mb-2">
+            <div className="col-span-2 md:col-span-5 -mb-2">
               <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 border border-slate-300 px-2.5 py-0.5 text-[11px] font-medium text-slate-600">
                 <Filter className="h-3 w-3" />
                 {t('financials.filteredLabel')}
@@ -195,6 +199,12 @@ export default function Financials() {
             <CardContent className="p-4 flex items-center justify-between">
               <div><p className="text-xs font-semibold uppercase">{t('financials.summaryBalance')}</p><p className={`text-lg sm:text-xl font-bold mt-1 ${balance >= 0 ? 'text-blue-700' : 'text-amber-700'}`}>{formatFCFA(balance)}</p></div>
               <Receipt className={`h-6 w-6 ${balance >= 0 ? 'text-blue-600' : 'text-amber-600'}`} />
+            </CardContent>
+          </Card>
+          <Card className="bg-teal-50 border-teal-200">
+            <CardContent className="p-4 flex items-center justify-between">
+              <div><p className="text-xs font-semibold text-teal-800 uppercase">{t('financials.summaryNetToPay')}</p><p className="text-lg sm:text-xl font-bold text-teal-700 mt-1">{formatFCFA(totalNetToPay)}</p></div>
+              <Wallet className="h-6 w-6 text-teal-600" />
             </CardContent>
           </Card>
         </div>
