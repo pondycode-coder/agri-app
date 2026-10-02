@@ -161,10 +161,6 @@ export default function CropCycles() {
       revenue_fcfa: harvestForm.revenue_fcfa || 0,
       notes: harvestForm.notes?.trim() || null,
     });
-    const cyc = crops.find((c) => c.id === harvestDialog.cycleId);
-    if (cyc && (cyc.status === 'planted' || cyc.status === 'growing')) {
-      dbStore.saveCropCycle({ id: cyc.id, plot_id: cyc.plot_id, status: 'harvested' });
-    }
     setHarvestDialog({ open: false, cycleId: '', cycleName: '' });
     toast({ title: t('crops.harvestToast') });
   };
