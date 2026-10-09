@@ -205,14 +205,15 @@ export interface FarmTask {
 export interface FinancialRecord {
   id: string;
   type: 'income' | 'expense' | 'investment';
-  amount: number; // in FCFA
+  amount: number;
   currency: 'XAF';
   date: string;
   description: string;
-  category: string; // 'Crop Sales', 'Labor & Wages', 'Fertilizer Purchase', 'Fuel', 'Equipment', 'Other'
+  category: string;
   farm_id: string;
   worker_id?: string | null;
   task_id?: string | null;
+  crop_cycle_id?: string | null;
   payment_method: 'cash' | 'orange_money' | 'mtn_momo' | 'bank_transfer';
   receipt_url?: string;
   related_contact_id?: string | null;
