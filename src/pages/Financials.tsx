@@ -16,7 +16,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { MobileListContainer, MobileListItem, MobileEmptyState } from '@/components/MobileList';
 import { PageHeader } from '@/components/PageHeader';
-import { Receipt, Plus, Pencil, Trash2, TrendingUp, TrendingDown, Landmark, Wallet, Filter, Search } from 'lucide-react';
+import { Receipt, Plus, Pencil, Trash2, TrendingUp, TrendingDown, Landmark, Wallet, Filter, Search, Sprout } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Pagination, PAGE_SIZE, clampPage } from '@/components/Pagination';
 
@@ -271,7 +271,15 @@ export default function Financials() {
                   <TableRow key={rec.id}>
                     <TableCell>{rec.date}</TableCell>
                     <TableCell><Badge className={rec.type === 'income' ? 'bg-emerald-100 text-emerald-800' : rec.type === 'investment' ? 'bg-indigo-100 text-indigo-800' : 'bg-rose-100 text-rose-800'}>{rec.type === 'income' ? t('financials.income') : rec.type === 'investment' ? t('financials.investment') : t('financials.expense')}</Badge></TableCell>
-                    <TableCell className="max-w-[200px] truncate">{rec.description}</TableCell>
+                    <TableCell className="max-w-[200px] truncate flex items-center gap-2">
+                      {rec.description}
+                      {rec.crop_cycle_id && (
+                        <Badge variant="secondary" className="shrink-0 whitespace-nowrap">
+                          <Sprout className="h-3 w-3 mr-1" />
+                          {t('financials.linkedHarvest')}
+                        </Badge>
+                      )}
+                    </TableCell>
                     <TableCell><Badge variant="secondary">{rec.category}</Badge></TableCell>
                     <TableCell className={rec.type === 'expense' ? 'text-rose-700 font-semibold' : rec.type === 'investment' ? 'text-indigo-700 font-semibold' : 'text-emerald-700 font-semibold'}>
                       {rec.type === 'expense' ? '−' : '+'} {formatFCFA(rec.amount)}
@@ -298,7 +306,15 @@ export default function Financials() {
               {paginatedRecords.map((rec) => (
                 <MobileListItem key={rec.id} onEdit={() => openEdit(rec)} onDelete={() => doDelete(rec.id)}>
                   <div className="flex items-start justify-between gap-2">
-                    <p className="font-semibold text-sm text-slate-800 dark:text-slate-200 truncate">{rec.description || '—'}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="font-semibold text-sm text-slate-800 dark:text-slate-200 truncate">{rec.description || '—'}</p>
+                      {rec.crop_cycle_id && (
+                        <Badge variant="secondary" className="shrink-0 whitespace-nowrap">
+                          <Sprout className="h-3 w-3 mr-1" />
+                          {t('financials.linkedHarvest')}
+                        </Badge>
+                      )}
+                    </div>
                     <span className={`shrink-0 text-sm font-semibold ${rec.type === 'expense' ? 'text-rose-700' : rec.type === 'investment' ? 'text-indigo-700' : 'text-emerald-700'}`}>
                       {rec.type === 'expense' ? '−' : '+'} {formatFCFA(rec.amount)}
                     </span>

@@ -287,6 +287,7 @@ class LocalDatabaseStore {
     this.financials = loaded.financials;
     this.investments = loaded.investments;
     this.pruneOrphanFinancials();
+    this.syncCropRevenueLinks();
     this.saveAll();
   }
 
@@ -309,9 +310,58 @@ class LocalDatabaseStore {
     }
   }
 
+  private syncCropRevenueLinks() {
+    const byCycle = new Map<string, { farm_id: string; revenue: number; latestDate: string }>();
+    for (const c of this.cropCycles) {
+      const plot = this.plots.find((p) => p.id === c.plot_id);
+      if (!plot) continue;
+      const hs = this.harvests.filter((h) => h.crop_cycle_id === c.id);
+      const revenue = hs.length > 0
+        ? hs.reduce((s, h) => s + (h.revenue_fcfa || 0), 0)
+        : (c.revenue_fcfa || 0);
+      if (revenue <= 0) continue;
+      const latestDate = hs.map((h) => h.harvest_date).sort().at(-1) || c.actual_harvest_date || c.expected_harvest_date || new Date().toISOString().split('T')[0];
+      byCycle.set(c.id, { farm_id: plot.farm_id, revenue, latestDate });
+    }
+    this.financials = this.financials.filter((f) => !(f.crop_cycle_id) || byCycle.has(f.crop_cycle_id));
+    for (const [cycleId, { farm_id, revenue, latestDate }] of byCycle) {
+      const existing = this.financials.find((f) => f.crop_cycle_id === cycleId && f.category === 'Vente Récolte');
+      if (existing) {
+        this.financials = this.financials.map((f) =>
+          f.id === existing.id ? { ...f, amount: revenue, date: latestDate, farm_id, updated_at: new Date().toISOString() } : f
+        );
+      } else {
+        const dup = this.financials.find((f) => !f.crop_cycle_id && f.farm_id === farm_id && f.category === 'Vente Récolte' && f.amount === revenue);
+        if (dup) {
+          this.financials = this.financials.map((f) =>
+            f.id === dup.id ? { ...f, crop_cycle_id: cycleId, amount: revenue, date: latestDate, updated_at: new Date().toISOString() } : f
+          );
+        } else {
+          this.financials.push({
+            id: crypto.randomUUID(),
+            type: 'income',
+            amount: revenue,
+            currency: 'XAF',
+            date: latestDate,
+            description: `Récolte — ${this.cropCycles.find((c) => c.id === cycleId)?.crop_name || 'Cycle'}`,
+            category: 'Vente Récolte',
+            farm_id,
+            crop_cycle_id: cycleId,
+            payment_method: 'cash',
+            related_contact_id: null,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          });
+        }
+      }
+    }
+  }
+
   /** Demo/offline farm switch: re-reads localStorage and notifies subscribers. */
   public hydrateLocal(_farmId?: string) {
     this.loadFromStorage();
+    this.syncCropRevenueLinks();
+    this.saveAll();
     this.notify();
   }
 
@@ -536,6 +586,7 @@ class LocalDatabaseStore {
     const now = new Date().toISOString();
     if (cropData.id) {
       this.cropCycles = this.cropCycles.map((c) => c.id === cropData.id ? { ...c, ...cropData, updated_at: now } : c);
+      this.syncCropRevenueLinks();
       this.saveAll();
       return this.cropCycles.find((c) => c.id === cropData.id)!;
     } else {
@@ -557,12 +608,14 @@ class LocalDatabaseStore {
         updated_at: now,
       };
       this.cropCycles.push(newCrop);
+      this.syncCropRevenueLinks();
       this.saveAll();
       return newCrop;
     }
   }
   public deleteCropCycle(id: string) {
     this.cropCycles = this.cropCycles.filter((c) => c.id !== id);
+    this.syncCropRevenueLinks();
     this.saveAll();
     this.queueRemote(() => this.deleteRemote('crop_cycles', id));
   }
@@ -578,6 +631,7 @@ class LocalDatabaseStore {
     const now = new Date().toISOString();
     if (harvestData.id) {
       this.harvests = this.harvests.map((h) => (h.id === harvestData.id ? { ...h, ...harvestData, updated_at: now } : h));
+      this.syncCropRevenueLinks();
       this.saveAll();
       return this.harvests.find((h) => h.id === harvestData.id)!;
     } else {
@@ -593,12 +647,14 @@ class LocalDatabaseStore {
         updated_at: now,
       };
       this.harvests.push(newHarvest);
+      this.syncCropRevenueLinks();
       this.saveAll();
       return newHarvest;
     }
   }
   public deleteHarvest(id: string) {
     this.harvests = this.harvests.filter((h) => h.id !== id);
+    this.syncCropRevenueLinks();
     this.saveAll();
     this.queueRemote(() => this.deleteRemote('harvests', id));
   }
