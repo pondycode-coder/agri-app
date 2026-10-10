@@ -249,10 +249,13 @@ export async function recordAuthEvent(
   name: string,
   farmId: string | null,
   eventType: 'login' | 'logout',
+  ipAddress?: string,
+  countryCode?: string,
+  countryName?: string,
 ): Promise<void> {
   try {
     const backend = activeBackend ?? new SupabaseBackend('');
-    await backend.recordAuthEvent(userId, email, name, farmId, eventType);
+    await backend.recordAuthEvent(userId, email, name, farmId, eventType, ipAddress, countryCode, countryName);
   } catch (err) {
     console.error('[remoteSync] recordAuthEvent:', err);
   }

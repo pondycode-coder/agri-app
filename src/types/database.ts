@@ -78,6 +78,9 @@ export interface AuthEvent {
   user_name: string;
   farm_name: string | null;
   event_type: 'login' | 'logout';
+  ip_address?: string | null;
+  country_code?: string | null;
+  country_name?: string | null;
   created_at: string;
 }
 

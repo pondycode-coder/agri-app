@@ -413,6 +413,9 @@ export class SupabaseBackend {
     name: string,
     farmId: string | null,
     eventType: 'login' | 'logout',
+    ipAddress?: string,
+    countryCode?: string,
+    countryName?: string,
   ): Promise<void> {
     if (!this.isConfigured()) return;
     const { error } = await supabase.rpc('record_auth_event', {
@@ -421,6 +424,9 @@ export class SupabaseBackend {
       p_user_name: name,
       p_farm_id: farmId,
       p_event_type: eventType,
+      p_ip_address: ipAddress,
+      p_country_code: countryCode,
+      p_country_name: countryName,
     } as never);
     if (error) console.error('[supabase] recordAuthEvent:', error.message);
   }

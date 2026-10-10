@@ -2,8 +2,29 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { dbStore } from '../services/store';
 import { Profile, Farm, AppRole, UserFarmMembership } from '../types/database';
 import { hashPin, verifyPin, pinToSecret } from '../lib/pinAuth';
-import { activateFarm, detachFarm, listUserFarms, switchFarm as switchFarmRemote, createFarmAndSwitch, joinFarmAndSwitch, setMyPin, getMyProfile, ensureMyProfile, isPinTaken } from '../lib/remoteSync';
+import { activateFarm, detachFarm, listUserFarms, switchFarm as switchFarmRemote, createFarmAndSwitch, joinFarmAndSwitch, setMyPin, getMyProfile, ensureMyProfile, isPinTaken, recordAuthEvent } from '../lib/remoteSync';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+
+interface GeoInfo {
+  ip?: string;
+  countryCode?: string;
+  countryName?: string;
+}
+
+async function fetchGeoInfo(): Promise<GeoInfo> {
+  try {
+    const res = await fetch('https://ipapi.co/json/');
+    if (!res.ok) return {};
+    const data = await res.json();
+    return {
+      ip: data.ip,
+      countryCode: data.country_code,
+      countryName: data.country_name,
+    };
+  } catch {
+    return {};
+  }
+}
 
 interface AuthContextType {
   user: Profile | null;
@@ -179,6 +200,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (!profile) throw new Error('Compte introuvable.');
         setUser(profile);
         await secureActivate(profile);
+        // Record login with geo info
+        const geo = await fetchGeoInfo();
+        void recordAuthEvent(profile.id, profile.email, profile.name, profile.farm_id ?? null, 'login', geo.ip, geo.countryCode, geo.countryName);
         return profile;
       } else {
         const profile = dbStore.getProfileByEmail(email);
@@ -194,6 +218,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
         setUser(profile);
         await secureActivate(profile);
+        // Record login (demo mode - no geo)
+        void recordAuthEvent(profile.id, profile.email, profile.name, profile.farm_id ?? null, 'login');
         return profile;
       }
     } finally {
@@ -301,6 +327,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const signOut = async () => {
+    // Record logout before clearing user
+    if (user) {
+      void recordAuthEvent(user.id, user.email, user.name, user.farm_id ?? null, 'logout');
+    }
     detachFarm();
     if (isSupabaseConfigured()) {
       await supabase.auth.signOut();

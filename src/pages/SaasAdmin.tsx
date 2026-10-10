@@ -37,7 +37,7 @@ import {
   adminResetPermissions,
 } from '@/lib/remoteSync';
 import { AdminFarm, AdminStats, AdminUser, AppRole, AuthEvent, formatFCFA } from '@/types/database';
-import { ShieldCheck, Building2, Users, LandPlot, ListChecks, Wallet, Trash2, RefreshCw, Ban, Check, LogIn, LogOut, Key, Edit3 } from 'lucide-react';
+import { ShieldCheck, Building2, Users, LandPlot, ListChecks, Wallet, Trash2, RefreshCw, Ban, Check, LogIn, LogOut, Key, Edit3, Globe } from 'lucide-react';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
@@ -573,6 +573,7 @@ export default function SaasAdmin() {
                       <TableHead>{t('saas.activityColUser')}</TableHead>
                       <TableHead>{t('saas.activityColFarm')}</TableHead>
                       <TableHead>{t('saas.activityColEvent')}</TableHead>
+                      <TableHead>{t('saas.activityColCountry')}</TableHead>
                       <TableHead>{t('saas.activityColDate')}</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -595,6 +596,16 @@ export default function SaasAdmin() {
                             </span>
                           )}
                         </TableCell>
+                        <TableCell>
+                          {ev.country_name ? (
+                            <span className="flex items-center gap-1">
+                              <Globe className="h-3.5 w-3.5" />
+                              {ev.country_name}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400">{t('saas.unknownLocation')}</span>
+                          )}
+                        </TableCell>
                         <TableCell className="whitespace-nowrap text-slate-500">
                           {new Date(ev.created_at).toLocaleString(localeTag)}
                         </TableCell>
@@ -602,7 +613,7 @@ export default function SaasAdmin() {
                     ))}
                     {events.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={4} className="text-center text-slate-400 py-6">
+                        <TableCell colSpan={5} className="text-center text-slate-400 py-6">
                           {t('saas.emptyActivity')}
                         </TableCell>
                       </TableRow>
@@ -630,6 +641,12 @@ export default function SaasAdmin() {
                       </div>
                       <div className="flex flex-wrap items-center gap-3 pt-1 text-xs text-slate-500">
                         <span className="truncate">{ev.farm_name || '—'}</span>
+                        {ev.country_name && (
+                          <span className="flex items-center gap-1 text-emerald-600">
+                            <Globe className="h-3.5 w-3.5" />
+                            {ev.country_name}
+                          </span>
+                        )}
                         <span className="text-slate-400 whitespace-nowrap">{new Date(ev.created_at).toLocaleString(localeTag)}</span>
                       </div>
                     </div>
