@@ -423,7 +423,7 @@ export default function CropCycles() {
             <DialogHeader><DialogTitle>{editingCrop ? t('crops.editCrop') : t('crops.addCrop')}</DialogTitle></DialogHeader>
             <div className="space-y-4">
               <div>
-                <Label>{t('plots.farm')}</Label>
+                <Label>{t('crops.plot')}</Label>
                 <Select value={form.plot_id} onValueChange={(v) => setForm({ ...form, plot_id: v })}>
                   <SelectTrigger><SelectValue placeholder={t('crops.plotPlaceholder')} /></SelectTrigger>
                   <SelectContent>{plots.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent>
