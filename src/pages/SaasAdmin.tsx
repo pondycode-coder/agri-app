@@ -111,7 +111,7 @@ export default function SaasAdmin() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [s, f, u, e] = await Promise.all([adminStats(), adminListFarms(), adminListUsers(), adminListAuthEvents()]);
+    const [s, f, u, e] = await Promise.all([adminStats(), adminListFarms(), adminListUsers(), adminListAuthEvents(1000)]);
     setStats(s);
     setFarms(f);
     setUsers(u);

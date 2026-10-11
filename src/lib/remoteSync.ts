@@ -261,7 +261,7 @@ export async function recordAuthEvent(
   }
 }
 
-export async function adminListAuthEvents(limit = 100): Promise<AuthEvent[]> {
+export async function adminListAuthEvents(limit = 1000): Promise<AuthEvent[]> {
   if (!activeBackend?.isConfigured()) return [];
   return activeBackend.adminListAuthEvents(limit);
 }
