@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { MobileListContainer, MobileListItem, MobileEmptyState } from '@/components/MobileList';
 import { PageHeader } from '@/components/PageHeader';
+import { Pagination, PAGE_SIZE, clampPage } from '@/components/Pagination';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -93,6 +94,9 @@ export default function SaasAdmin() {
   const [farms, setFarms] = useState<AdminFarm[]>([]);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [events, setEvents] = useState<AuthEvent[]>([]);
+  const [farmsPage, setFarmsPage] = useState(1);
+  const [usersPage, setUsersPage] = useState(1);
+  const [eventsPage, setEventsPage] = useState(1);
   const [pinDialogOpen, setPinDialogOpen] = useState(false);
   const [pinTargetUser, setPinTargetUser] = useState<{ id: string; name: string } | null>(null);
   const [newPin, setNewPin] = useState('');
@@ -100,6 +104,10 @@ export default function SaasAdmin() {
   const [perms, setPerms] = useState<PermMap>(buildEmptyPerms);
   const [permsBase, setPermsBase] = useState<PermMap | null>(null);
   const [permsDirty, setPermsDirty] = useState(false);
+
+  const paginatedFarms = farms.slice((clampPage(farmsPage, farms.length) - 1) * PAGE_SIZE, clampPage(farmsPage, farms.length) * PAGE_SIZE);
+  const paginatedUsers = users.slice((clampPage(usersPage, users.length) - 1) * PAGE_SIZE, clampPage(usersPage, users.length) * PAGE_SIZE);
+  const paginatedEvents = events.slice((clampPage(eventsPage, events.length) - 1) * PAGE_SIZE, clampPage(eventsPage, events.length) * PAGE_SIZE);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -316,7 +324,13 @@ export default function SaasAdmin() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {farms.map((farm) => (
+                    {paginatedFarms.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={9} className="text-center text-slate-400 py-6">
+                          {t('saas.emptyFarms')}
+                        </TableCell>
+                      </TableRow>
+                    ) : paginatedFarms.map((farm) => (
                       <TableRow key={farm.id}>
                         <TableCell className="font-medium">{farm.name}</TableCell>
                         <TableCell>{farm.location || '—'}</TableCell>
@@ -364,7 +378,7 @@ export default function SaasAdmin() {
                 </Table>
                 </div>
                 <MobileListContainer>
-                  {farms.map((farm) => (
+                  {paginatedFarms.map((farm) => (
                     <MobileListItem key={farm.id} onDelete={() => void handleDeleteFarm(farm.id)}>
                       <div className="flex items-start justify-between gap-2">
                         <p className="font-semibold text-sm text-slate-800 dark:text-slate-200 truncate">{farm.name}</p>
@@ -382,7 +396,8 @@ export default function SaasAdmin() {
                     </MobileListItem>
                   ))}
                 </MobileListContainer>
-                {farms.length === 0 && <MobileEmptyState message={t('saas.emptyFarms')} />}
+                {paginatedFarms.length === 0 && <MobileEmptyState message={t('saas.emptyFarms')} />}
+                <Pagination total={farms.length} page={farmsPage} onPageChange={setFarmsPage} />
               </CardContent>
             </Card>
           </TabsContent>
@@ -404,7 +419,13 @@ export default function SaasAdmin() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {users.map((u) => (
+                    {paginatedUsers.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center text-slate-400 py-6">
+                          {t('saas.emptyUsers')}
+                        </TableCell>
+                      </TableRow>
+                    ) : paginatedUsers.map((u) => (
                       <TableRow key={u.id}>
                         <TableCell className="font-medium">{u.name || '—'}</TableCell>
                         <TableCell>{u.email}</TableCell>
@@ -475,7 +496,7 @@ export default function SaasAdmin() {
                         <TableCell>{new Date(u.created_at).toLocaleDateString(localeTag)}</TableCell>
                       </TableRow>
                     ))}
-                    {users.length === 0 && (
+                    {paginatedUsers.length === 0 && (
                       <TableRow>
                         <TableCell colSpan={7} className="text-center text-slate-400 py-6">
                           {t('saas.emptyUsers')}
@@ -486,7 +507,7 @@ export default function SaasAdmin() {
                 </Table>
                 </div>
                 <MobileListContainer>
-                  {users.map((u) => (
+                  {paginatedUsers.map((u) => (
                     <div key={u.id} className="py-3.5 px-4">
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
@@ -558,7 +579,8 @@ export default function SaasAdmin() {
                     </div>
                   ))}
                 </MobileListContainer>
-                {users.length === 0 && <MobileEmptyState message={t('saas.emptyUsers')} />}
+                {paginatedUsers.length === 0 && <MobileEmptyState message={t('saas.emptyUsers')} />}
+                <Pagination total={users.length} page={usersPage} onPageChange={setUsersPage} />
               </CardContent>
             </Card>
           </TabsContent>
@@ -578,7 +600,7 @@ export default function SaasAdmin() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {events.map((ev) => (
+                    {paginatedEvents.map((ev) => (
                       <TableRow key={ev.id}>
                         <TableCell>
                           <div className="font-medium">{ev.user_name || '—'}</div>
@@ -611,7 +633,7 @@ export default function SaasAdmin() {
                         </TableCell>
                       </TableRow>
                     ))}
-                    {events.length === 0 && (
+                    {paginatedEvents.length === 0 && (
                       <TableRow>
                         <TableCell colSpan={5} className="text-center text-slate-400 py-6">
                           {t('saas.emptyActivity')}
@@ -622,7 +644,7 @@ export default function SaasAdmin() {
                 </Table>
                 </div>
                 <MobileListContainer>
-                  {events.map((ev) => (
+                  {paginatedEvents.map((ev) => (
                     <div key={ev.id} className="py-3.5 px-4">
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
@@ -653,6 +675,7 @@ export default function SaasAdmin() {
                   ))}
                 </MobileListContainer>
                 {events.length === 0 && <MobileEmptyState message={t('saas.emptyActivity')} />}
+                <Pagination total={events.length} page={eventsPage} onPageChange={setEventsPage} />
               </CardContent>
             </Card>
           </TabsContent>
