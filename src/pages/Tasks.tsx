@@ -17,7 +17,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { MobileListContainer, MobileListItem, MobileEmptyState } from '@/components/MobileList';
 import { PageHeader } from '@/components/PageHeader';
-import { CheckSquare, Plus, Pencil, Trash2, ChevronDown, Search, X } from 'lucide-react';
+import { CheckSquare, Plus, Pencil, Trash2, ChevronDown, Search, X, Check } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Pagination, PAGE_SIZE, clampPage } from '@/components/Pagination';
 import { formatFCFA } from '@/types/database';
@@ -143,6 +143,43 @@ export default function Tasks() {
       }
       return { ...prev, worker_ids: [...prev.worker_ids, workerId], worker_wages, advance_batches };
     });
+  };
+
+  const fillRemainingAndMarkPaid = () => {
+    setForm((prev) => {
+      // Calculate remaining per worker = wage - total advances for that worker
+      const advancesPerWorker: Record<string, number> = {};
+      prev.advance_batches.forEach((b) => {
+        Object.entries(b.amounts).forEach(([wid, val]) => {
+          advancesPerWorker[wid] = (advancesPerWorker[wid] || 0) + (Number(val) || 0);
+        });
+      });
+      const remainingPerWorker: Record<string, number> = {};
+      Object.entries(prev.worker_wages).forEach(([wid, wage]) => {
+        const paid = advancesPerWorker[wid] || 0;
+        const wageNum = Number(wage) || 0;
+        const rem = Math.max(0, wageNum - paid);
+        if (rem > 0) remainingPerWorker[wid] = rem;
+      });
+      // Only add batch if there's something to pay
+      if (Object.values(remainingPerWorker).every((v) => v === 0)) return prev;
+      const newBatch: TaskAdvanceBatch = {
+        id: crypto.randomUUID(),
+        date: new Date().toISOString().split('T')[0],
+        amounts: remainingPerWorker,
+      };
+      return {
+        ...prev,
+        advance_batches: [...prev.advance_batches, newBatch],
+        wage_paid: true,
+      };
+    });
+  };
+
+  const fillRemainingAndSave = () => {
+    fillRemainingAndMarkPaid();
+    // Wait for state update then save
+    setTimeout(() => handleSave(), 0);
   };
 
   const batchAmountSum = (b: TaskAdvanceBatch) => Object.values(b.amounts).reduce((s, v) => s + (Number(v) || 0), 0);
@@ -535,9 +572,22 @@ export default function Tasks() {
                     <div className="mt-1">
                       <div className="flex items-center justify-between mb-1.5">
                         <span className="text-sm font-medium text-slate-700">{t('tasks.advances')}</span>
-                        <Button type="button" variant="outline" size="sm" onClick={addAdvanceBatch} disabled={form.worker_ids.length === 0}>
-                          <Plus className="h-3.5 w-3.5 mr-1" />{t('tasks.addAdvance')}
-                        </Button>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={fillRemainingAndSave}
+                            disabled={form.worker_ids.length === 0 || form.wage_paid}
+                            className="text-emerald-700 border-emerald-300 hover:bg-emerald-50"
+                          >
+                            <Check className="h-3.5 w-3.5 mr-1" />
+                            {t('tasks.fillRemainingAndMarkPaid')}
+                          </Button>
+                          <Button type="button" variant="outline" size="sm" onClick={addAdvanceBatch} disabled={form.worker_ids.length === 0}>
+                            <Plus className="h-3.5 w-3.5 mr-1" />{t('tasks.addAdvance')}
+                          </Button>
+                        </div>
                       </div>
                       {form.advance_batches.length === 0 ? (
                         <p className="text-sm text-slate-400">{t('tasks.noAdvances')}</p>
