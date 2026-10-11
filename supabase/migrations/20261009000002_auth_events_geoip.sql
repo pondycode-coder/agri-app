@@ -29,7 +29,9 @@ $$;
 grant execute on function public.record_auth_event(uuid, text, text, uuid, text, inet, char(2), text) to authenticated;
 
 -- Update admin_list_auth_events to return geo fields
-create or replace function public.admin_list_auth_events(p_limit integer default 100)
+drop function if exists public.admin_list_auth_events(integer);
+
+create function public.admin_list_auth_events(p_limit integer default 100)
 returns table (
   id uuid,
   user_email text,
