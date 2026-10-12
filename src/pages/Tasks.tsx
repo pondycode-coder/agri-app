@@ -145,7 +145,7 @@ export default function Tasks() {
     });
   };
 
-  const fillRemainingAndMarkPaid = () => {
+  const fillRemainingAndSave = () => {
     setForm((prev) => {
       // Calculate remaining per worker = wage - total advances for that worker
       const advancesPerWorker: Record<string, number> = {};
@@ -168,18 +168,19 @@ export default function Tasks() {
         date: new Date().toISOString().split('T')[0],
         amounts: remainingPerWorker,
       };
-      return {
+      const nextForm = {
         ...prev,
         advance_batches: [...prev.advance_batches, newBatch],
         wage_paid: true,
       };
+      // Save immediately with the new form state
+      setTimeout(() => {
+        dbStore.saveTask({ ...nextForm, id: editing?.id });
+        setDialogOpen(false);
+        toast({ title: editing ? t('common.successUpdated') : t('common.successCreated') });
+      }, 0);
+      return nextForm;
     });
-  };
-
-  const fillRemainingAndSave = () => {
-    fillRemainingAndMarkPaid();
-    // Wait for state update then save
-    setTimeout(() => handleSave(), 0);
   };
 
   const batchAmountSum = (b: TaskAdvanceBatch) => Object.values(b.amounts).reduce((s, v) => s + (Number(v) || 0), 0);
