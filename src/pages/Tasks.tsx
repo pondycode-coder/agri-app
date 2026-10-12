@@ -17,7 +17,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { MobileListContainer, MobileListItem, MobileEmptyState } from '@/components/MobileList';
 import { PageHeader } from '@/components/PageHeader';
-import { CheckSquare, Plus, Pencil, Trash2, ChevronDown, Search, X, Check } from 'lucide-react';
+import { CheckSquare, Plus, Pencil, Trash2, ChevronDown, Search, X, Check, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Pagination, PAGE_SIZE, clampPage } from '@/components/Pagination';
 import { formatFCFA } from '@/types/database';
@@ -51,6 +51,7 @@ export default function Tasks() {
   const [statusFilter, setStatusFilter] = useState<'all' | FarmTask['status']>('all');
   const [dueDateFilter, setDueDateFilter] = useState('');
   const [page, setPage] = useState(1);
+  const [fillingRemaining, setFillingRemaining] = useState(false);
 
   const refresh = () => {
     setTasks(dbStore.getTasks());
@@ -146,6 +147,8 @@ export default function Tasks() {
   };
 
   const fillRemainingAndSave = () => {
+    if (fillingRemaining) return;
+    setFillingRemaining(true);
     setForm((prev) => {
       // Calculate remaining per worker = wage - total advances for that worker
       const advancesPerWorker: Record<string, number> = {};
@@ -175,9 +178,15 @@ export default function Tasks() {
       };
       // Save immediately with the new form state
       setTimeout(() => {
-        dbStore.saveTask({ ...nextForm, id: editing?.id });
-        setDialogOpen(false);
-        toast({ title: editing ? t('common.successUpdated') : t('common.successCreated') });
+        try {
+          dbStore.saveTask({ ...nextForm, id: editing?.id });
+          setDialogOpen(false);
+          toast({ title: editing ? t('common.successUpdated') : t('common.successCreated') });
+        } catch (err) {
+          toast({ title: t('common.error'), description: err instanceof Error ? err.message : String(err), variant: 'destructive' });
+        } finally {
+          setFillingRemaining(false);
+        }
       }, 0);
       return nextForm;
     });
@@ -579,11 +588,20 @@ export default function Tasks() {
                             variant="outline"
                             size="sm"
                             onClick={fillRemainingAndSave}
-                            disabled={form.worker_ids.length === 0 || form.wage_paid}
+                            disabled={form.worker_ids.length === 0 || form.wage_paid || fillingRemaining}
                             className="text-emerald-700 border-emerald-300 hover:bg-emerald-50"
                           >
-                            <Check className="h-3.5 w-3.5 mr-1" />
-                            {t('tasks.fillRemainingAndMarkPaid')}
+                            {fillingRemaining ? (
+                              <>
+                                <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                                {t('tasks.filling')}
+                              </>
+                            ) : (
+                              <>
+                                <Check className="h-3.5 w-3.5 mr-1" />
+                                {t('tasks.fillRemainingAndMarkPaid')}
+                              </>
+                            )}
                           </Button>
                           <Button type="button" variant="outline" size="sm" onClick={addAdvanceBatch} disabled={form.worker_ids.length === 0}>
                             <Plus className="h-3.5 w-3.5 mr-1" />{t('tasks.addAdvance')}
