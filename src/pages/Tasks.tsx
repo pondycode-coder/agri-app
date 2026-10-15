@@ -164,8 +164,10 @@ export default function Tasks() {
         const rem = Math.max(0, wageNum - paid);
         if (rem > 0) remainingPerWorker[wid] = rem;
       });
+      // Wages already marked paid: just mark the task completed (no new batch)
+      const wagesAlreadyPaid = prev.wage_paid;
       // Only add batch if there's something to pay
-      if (Object.values(remainingPerWorker).every((v) => v === 0)) return prev;
+      const hasRemaining = !wagesAlreadyPaid && Object.values(remainingPerWorker).some((v) => v > 0);
       const newBatch: TaskAdvanceBatch = {
         id: crypto.randomUUID(),
         date: new Date().toISOString().split('T')[0],
@@ -173,8 +175,9 @@ export default function Tasks() {
       };
       const nextForm = {
         ...prev,
-        advance_batches: [...prev.advance_batches, newBatch],
+        advance_batches: hasRemaining ? [...prev.advance_batches, newBatch] : prev.advance_batches,
         wage_paid: true,
+        status: 'completed' as const,
       };
       // Save immediately with the new form state
       setTimeout(() => {
@@ -588,7 +591,7 @@ export default function Tasks() {
                             variant="outline"
                             size="sm"
                             onClick={fillRemainingAndSave}
-                            disabled={form.worker_ids.length === 0 || form.wage_paid || fillingRemaining}
+                            disabled={form.worker_ids.length === 0 || (form.wage_paid && form.status === 'completed') || fillingRemaining}
                             className="text-emerald-700 border-emerald-300 hover:bg-emerald-50"
                           >
                             {fillingRemaining ? (
