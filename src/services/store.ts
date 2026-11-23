@@ -26,6 +26,7 @@ import {
   INITIAL_INVESTMENTS,
 } from './mockData';
 import { SupabaseBackend, EntityKey } from '../lib/supabaseBackend';
+import { BackupData, buildBackup } from '../lib/backup';
 
 type Listener = () => void;
 
@@ -1068,6 +1069,42 @@ class LocalDatabaseStore {
     this.investments = this.investments.filter((i) => i.id !== id);
     this.saveAll();
     this.queueRemote(() => this.deleteRemote('investments', id));
+  }
+
+  // --- BACKUP / RESTORE ---------------------------------------------------
+  /** Snapshot of every data repository the app uses (farms, plots, crops, harvests, inventory, workers, tasks, finances, investments, profiles). */
+  public exportBackup(): BackupData {
+    return buildBackup({
+      profiles: this.profiles,
+      farms: this.farms,
+      plots: this.plots,
+      crop_cycles: this.cropCycles,
+      harvests: this.harvests,
+      contacts: this.contacts,
+      inventory: this.inventory,
+      workers: this.workers,
+      tasks: this.tasks,
+      financials: this.financials,
+      investments: this.investments,
+    });
+  }
+
+  /** Replace every data repository with a backup file's contents. */
+  public restoreFromBackup(backup: BackupData): void {
+    this.profiles = [...backup.data.profiles];
+    this.farms = [...backup.data.farms];
+    this.plots = [...backup.data.plots];
+    this.cropCycles = [...backup.data.crop_cycles];
+    this.harvests = [...backup.data.harvests];
+    this.contacts = [...backup.data.contacts];
+    this.inventory = [...backup.data.inventory];
+    this.workers = [...backup.data.workers];
+    this.tasks = [...backup.data.tasks];
+    this.financials = [...backup.data.financials];
+    this.investments = [...backup.data.investments];
+    // saveAll() persists to localStorage and pushes the restored rows to
+    // Supabase when a remote backend is attached.
+    this.saveAll();
   }
 }
 

@@ -29,6 +29,7 @@ import {
   Link2,
   ServerCog,
   CircleHelp,
+  DatabaseBackup,
   type LucideIcon,
 } from 'lucide-react';
 import {
@@ -79,6 +80,7 @@ export const MainLayout = ({ children }: { children: React.ReactNode }) => {
     { path: '/dashboard/investments', label: t('layout.sidebar.investments'), icon: TrendingUp, resource: 'investments' as const },
     { path: '/dashboard/help', label: t('layout.sidebar.help'), icon: CircleHelp, resource: 'dashboard' as const },
     { path: '/dashboard/profile', label: t('layout.sidebar.profile'), icon: UserCircle, resource: 'profile' as const },
+    { path: '/dashboard/backup', label: t('layout.sidebar.backup'), icon: DatabaseBackup, resource: 'profile' as const },
     ...(isSuperAdmin
       ? [{ path: '/dashboard/saas-admin', label: 'SaaS Admin', icon: ServerCog, resource: 'saas-admin' as const }]
       : []),
