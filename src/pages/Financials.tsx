@@ -19,6 +19,7 @@ import { PageHeader } from '@/components/PageHeader';
 import { Receipt, Plus, Pencil, Trash2, TrendingUp, TrendingDown, Landmark, Wallet, Filter, Search, Sprout } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Pagination, PAGE_SIZE, clampPage } from '@/components/Pagination';
+import { ViewToggle, ListViewMode } from '@/components/ViewToggle';
 
 const INCOME_CATEGORIES = ['Vente Récolte', 'Location Terrain', 'Subvention', 'Autre Revenu'];
 const EXPENSE_CATEGORIES = ['Achat Intrants', 'Salaires Ouvriers', 'Avance Salaire', 'Carburant & Énergie', 'Équipement', 'Autre Dépense'];
@@ -43,6 +44,7 @@ export default function Financials() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [page, setPage] = useState(1);
+  const [viewMode, setViewMode] = useState<ListViewMode>('table');
 
   useEffect(() => {
     const refresh = () => {
@@ -251,6 +253,54 @@ export default function Financials() {
               <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="w-40" title={t('financials.dateFrom')} />
               <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="w-40" title={t('financials.dateTo')} />
             </div>
+            <div className="flex justify-end px-4 pt-3">
+              <ViewToggle mode={viewMode} onChange={setViewMode} />
+            </div>
+            {viewMode === 'grid' ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 px-4">
+                {paginatedRecords.length === 0 ? (
+                  <p className="col-span-full py-6 text-center text-slate-500">{t('common.noData')}</p>
+                ) : paginatedRecords.map((rec) => (
+                  <Card key={rec.id} className="py-3">
+                    <CardContent className="p-4 space-y-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 truncate">{rec.description || '—'}</p>
+                          {rec.crop_cycle_id && (
+                            <Badge variant="secondary" className="mt-1 whitespace-nowrap">
+                              <Sprout className="h-3 w-3 mr-1" />{t('financials.linkedHarvest')}
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <Button variant="ghost" size="icon" onClick={() => openEdit(rec)}><Pencil className="h-4 w-4" /></Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="ghost" size="icon" onClick={() => setDeleteId(rec.id)}><Trash2 className="h-4 w-4 text-red-500" /></Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader><AlertDialogTitle>{t('common.confirm')}</AlertDialogTitle><AlertDialogDescription>{t('common.areYouSure')}</AlertDialogDescription></AlertDialogHeader>
+                              <AlertDialogFooter><AlertDialogCancel onClick={() => setDeleteId(null)}>{t('common.cancel')}</AlertDialogCancel><AlertDialogAction onClick={handleDelete}>{t('common.delete')}</AlertDialogAction></AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+                        <Badge className={rec.type === 'income' ? 'bg-emerald-100 text-emerald-800' : rec.type === 'investment' ? 'bg-indigo-100 text-indigo-800' : 'bg-rose-100 text-rose-800'}>
+                          {rec.type === 'income' ? t('financials.income') : rec.type === 'investment' ? t('financials.investment') : t('financials.expense')}
+                        </Badge>
+                        <Badge variant="secondary">{rec.category}</Badge>
+                        <span>{rec.date}</span>
+                        <span className="text-slate-400">{methodLabels[rec.payment_method] || rec.payment_method}</span>
+                      </div>
+                      <div className={`text-lg font-semibold ${rec.type === 'expense' ? 'text-rose-700' : rec.type === 'investment' ? 'text-indigo-700' : 'text-emerald-700'}`}>
+                        {rec.type === 'expense' ? '−' : '+'} {formatFCFA(rec.amount)}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
             <div className="hidden md:block">
             <Table>
               <TableHeader>
@@ -301,7 +351,8 @@ export default function Financials() {
                 ))}
               </TableBody>
             </Table>
-            </div>
+              </div>
+            )}
             <MobileListContainer>
               {paginatedRecords.map((rec) => (
                 <MobileListItem key={rec.id} onEdit={() => openEdit(rec)} onDelete={() => doDelete(rec.id)}>

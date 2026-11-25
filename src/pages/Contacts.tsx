@@ -18,6 +18,7 @@ import { PageHeader } from '@/components/PageHeader';
 import { BookUser, Plus, Pencil, Trash2, Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Pagination, PAGE_SIZE, clampPage } from '@/components/Pagination';
+import { ViewToggle, ListViewMode } from '@/components/ViewToggle';
 
 const typeLabels: Record<string, string> = {
   customer: 'Client', supplier: 'Fournisseur', partner: 'Partenaire',
@@ -34,6 +35,7 @@ export default function Contacts() {
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<'all' | Contact['type']>('all');
   const [page, setPage] = useState(1);
+  const [viewMode, setViewMode] = useState<ListViewMode>('table');
 
   useEffect(() => {
     const refresh = () => setContacts(dbStore.getContacts());
@@ -117,6 +119,42 @@ export default function Contacts() {
                 </SelectContent>
               </Select>
             </div>
+            <div className="flex justify-end px-4 pt-3">
+              <ViewToggle mode={viewMode} onChange={setViewMode} />
+            </div>
+            {viewMode === 'grid' ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 px-4">
+                {paginatedContacts.length === 0 ? (
+                  <p className="col-span-full py-6 text-center text-slate-500">{t('common.noData')}</p>
+                ) : paginatedContacts.map((c) => (
+                  <Card key={c.id} className="py-3">
+                    <CardContent className="p-4 space-y-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="font-semibold text-sm text-slate-800 dark:text-slate-200 truncate">{c.name}</p>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <Button variant="ghost" size="icon" onClick={() => openEdit(c)}><Pencil className="h-4 w-4" /></Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="ghost" size="icon" onClick={() => setDeleteId(c.id)}><Trash2 className="h-4 w-4 text-red-500" /></Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader><AlertDialogTitle>{t('common.confirm')}</AlertDialogTitle><AlertDialogDescription>{t('common.areYouSure')}</AlertDialogDescription></AlertDialogHeader>
+                              <AlertDialogFooter><AlertDialogCancel onClick={() => setDeleteId(null)}>{t('common.cancel')}</AlertDialogCancel><AlertDialogAction onClick={handleDelete}>{t('common.delete')}</AlertDialogAction></AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+                        <Badge className={typeBadgeColor[c.type] || ''}>{typeLabels[c.type] || c.type}</Badge>
+                        <span className="truncate">{c.phone}</span>
+                        {c.email && <span className="truncate">{c.email}</span>}
+                        {c.address && <span className="text-slate-400 truncate">{c.address}</span>}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
             <div className="hidden md:block">
             <Table>
               <TableHeader>
@@ -155,7 +193,8 @@ export default function Contacts() {
                 ))}
               </TableBody>
             </Table>
-            </div>
+              </div>
+            )}
             <MobileListContainer>
               {paginatedContacts.map((c) => (
                 <MobileListItem key={c.id} onEdit={() => openEdit(c)} onDelete={() => doDelete(c.id)}>

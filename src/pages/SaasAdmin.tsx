@@ -588,6 +588,12 @@ export default function SaasAdmin() {
           <TabsContent value="activity" className="space-y-4">
             <Card>
               <CardContent className="pt-6">
+                <div className="flex justify-end px-4">
+                  <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading}>
+                    <RefreshCw className={`h-4 w-4 mr-1.5 ${loading ? 'animate-spin' : ''}`} />
+                    {t('saas.refresh')}
+                  </Button>
+                </div>
                 <div className="hidden md:block">
                 <Table>
                   <TableHeader>

@@ -17,6 +17,7 @@ import { PageHeader } from '@/components/PageHeader';
 import { Grid as GridIcon, Plus, Pencil, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Pagination, PAGE_SIZE, clampPage } from '@/components/Pagination';
+import { ViewToggle, ListViewMode } from '@/components/ViewToggle';
 
 const statusColors: Record<string, string> = {
   active: 'bg-emerald-100 text-emerald-800',
@@ -36,6 +37,7 @@ export default function Plots() {
   const [form, setForm] = useState({ farm_id: '', name: '', size_in_hectares: 1, soil_type: 'Volcanique', status: 'active' as Plot['status'] });
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
+  const [viewMode, setViewMode] = useState<ListViewMode>('table');
   const cp = clampPage(page, plots.length);
   const paginatedPlots = plots.slice((cp - 1) * PAGE_SIZE, cp * PAGE_SIZE);
 
@@ -100,7 +102,55 @@ export default function Plots() {
         </PageHeader>
 
         <Card>
-          <CardContent className="p-0">
+          <CardContent className="p-0 space-y-3">
+            <div className="flex justify-end px-4 pt-3">
+              <ViewToggle mode={viewMode} onChange={setViewMode} />
+            </div>
+            {viewMode === 'grid' ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 px-4">
+                {paginatedPlots.length === 0 ? (
+                  <p className="col-span-full py-6 text-center text-slate-500">{t('common.noData')}</p>
+                ) : (
+                  paginatedPlots.map((plot) => (
+                    <Card key={plot.id} className="py-3">
+                      <CardContent className="p-4 space-y-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="font-semibold text-sm text-slate-800 dark:text-slate-200 truncate">{plot.name}</p>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <Button variant="ghost" size="icon" onClick={() => openEdit(plot)}>
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="icon" onClick={() => setDeleteId(plot.id)}>
+                                  <Trash2 className="h-4 w-4 text-red-500" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>{t('common.confirm')}</AlertDialogTitle>
+                                  <AlertDialogDescription>{t('common.areYouSure')}</AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel onClick={() => setDeleteId(null)}>{t('common.cancel')}</AlertDialogCancel>
+                                  <AlertDialogAction onClick={handleDelete}>{t('common.delete')}</AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </div>
+                        <p className="text-xs text-slate-500 truncate">{getFarmName(plot.farm_id)}</p>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge variant="secondary">{plot.size_in_hectares} ha</Badge>
+                          <Badge variant="secondary">{plot.soil_type}</Badge>
+                          <Badge className={statusColors[plot.status] || ''}>{statusLabel(plot.status)}</Badge>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))
+                )}
+              </div>
+            ) : (
             <div className="hidden md:block">
             <Table>
               <TableHeader>
@@ -153,7 +203,8 @@ export default function Plots() {
                 )}
               </TableBody>
             </Table>
-            </div>
+              </div>
+            )}
             <MobileListContainer>
               {paginatedPlots.map((plot) => (
                 <MobileListItem key={plot.id} onEdit={() => openEdit(plot)} onDelete={() => doDelete(plot.id)}>

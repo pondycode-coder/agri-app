@@ -18,6 +18,7 @@ import { PageHeader } from '@/components/PageHeader';
 import { Users, Plus, Pencil, Trash2, Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Pagination, PAGE_SIZE, clampPage } from '@/components/Pagination';
+import { ViewToggle, ListViewMode } from '@/components/ViewToggle';
 
 const roleLabels: Record<string, string> = {
   field_worker: 'Ouvrier', agronomist: 'Agronome', machine_operator: 'Conducteur', supervisor: 'Chef d\'équipe',
@@ -36,6 +37,7 @@ export default function Workers() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [roleFilter, setRoleFilter] = useState<'all' | Worker['role']>('all');
   const [page, setPage] = useState(1);
+  const [viewMode, setViewMode] = useState<ListViewMode>('table');
 
   useEffect(() => {
     const refresh = () => {
@@ -136,6 +138,43 @@ export default function Workers() {
                 </Select>
               </div>
             </div>
+            <div className="flex justify-end px-4 pt-3">
+              <ViewToggle mode={viewMode} onChange={setViewMode} />
+            </div>
+            {viewMode === 'grid' ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 px-4">
+                {paginatedWorkers.length === 0 ? (
+                  <p className="col-span-full py-6 text-center text-slate-500">{t('common.noData')}</p>
+                ) : paginatedWorkers.map((w) => (
+                  <Card key={w.id} className="py-3">
+                    <CardContent className="p-4 space-y-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="font-semibold text-sm text-slate-800 dark:text-slate-200 truncate">{w.name}</p>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <Switch checked={w.is_active} onCheckedChange={() => handleToggleActive(w)} aria-label={t('workers.status')} className="data-[state=checked]:bg-emerald-600" />
+                          <Button variant="ghost" size="icon" onClick={() => openEdit(w)}><Pencil className="h-4 w-4" /></Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="ghost" size="icon" onClick={() => setDeleteId(w.id)}><Trash2 className="h-4 w-4 text-red-500" /></Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader><AlertDialogTitle>{t('common.confirm')}</AlertDialogTitle><AlertDialogDescription>{t('common.areYouSure')}</AlertDialogDescription></AlertDialogHeader>
+                              <AlertDialogFooter><AlertDialogCancel onClick={() => setDeleteId(null)}>{t('common.cancel')}</AlertDialogCancel><AlertDialogAction onClick={handleDelete}>{t('common.delete')}</AlertDialogAction></AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+                        <Badge variant="secondary">{roleLabels[w.role] || w.role}</Badge>
+                        <span className={w.is_active ? 'text-emerald-700 font-medium' : 'text-slate-400'}>{w.is_active ? t('workers.active') : t('workers.inactive')}</span>
+                        <span>{w.total_tasks_completed} tâches terminées</span>
+                      </div>
+                      <p className="text-sm text-slate-500">{w.phone_number || '—'}</p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
             <div className="hidden md:block">
             <Table>
               <TableHeader>
@@ -180,7 +219,8 @@ export default function Workers() {
                 ))}
               </TableBody>
             </Table>
-            </div>
+              </div>
+            )}
             <MobileListContainer>
               {paginatedWorkers.map((w) => (
                 <MobileListItem key={w.id} onEdit={() => openEdit(w)} onDelete={() => doDelete(w.id)}>

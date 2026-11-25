@@ -17,6 +17,7 @@ import { PageHeader } from '@/components/PageHeader';
 import { Tractor, Plus, Pencil, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Pagination, PAGE_SIZE, clampPage } from '@/components/Pagination';
+import { ViewToggle, ListViewMode } from '@/components/ViewToggle';
 
 export default function Farms() {
   const { t } = useI18n();
@@ -28,6 +29,7 @@ export default function Farms() {
   const [form, setForm] = useState({ name: '', location: '', size_in_hectares: 1, description: '' });
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
+  const [viewMode, setViewMode] = useState<ListViewMode>('table');
   const cp = clampPage(page, farms.length);
   const paginatedFarms = farms.slice((cp - 1) * PAGE_SIZE, cp * PAGE_SIZE);
 
@@ -82,7 +84,54 @@ export default function Farms() {
         </PageHeader>
 
         <Card>
-          <CardContent className="p-0">
+          <CardContent className="p-0 space-y-3">
+            <div className="flex justify-end px-4 pt-3">
+              <ViewToggle mode={viewMode} onChange={setViewMode} />
+            </div>
+            {viewMode === 'grid' ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 px-4">
+                {paginatedFarms.length === 0 ? (
+                  <p className="col-span-full py-6 text-center text-slate-500">{t('common.noData')}</p>
+                ) : (
+                  paginatedFarms.map((farm) => (
+                    <Card key={farm.id} className="py-3">
+                      <CardContent className="p-4 space-y-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="font-semibold text-sm text-slate-800 dark:text-slate-200 truncate">{farm.name}</p>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <Button variant="ghost" size="icon" onClick={() => openEdit(farm)}>
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="icon" onClick={() => setDeleteId(farm.id)}>
+                                  <Trash2 className="h-4 w-4 text-red-500" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>{t('common.confirm')}</AlertDialogTitle>
+                                  <AlertDialogDescription>{t('common.areYouSure')}</AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel onClick={() => setDeleteId(null)}>{t('common.cancel')}</AlertDialogCancel>
+                                  <AlertDialogAction onClick={handleDelete}>{t('common.delete')}</AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </div>
+                        <p className="text-xs text-slate-500 truncate">{farm.location || '—'}</p>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge variant="secondary">{farm.plots} parcelle{farm.plots > 1 ? 's' : ''}</Badge>
+                          <Badge variant="secondary">{farm.size_in_hectares} ha</Badge>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))
+                )}
+              </div>
+            ) : (
             <div className="hidden md:block">
             <Table>
               <TableHeader>
@@ -133,7 +182,8 @@ export default function Farms() {
                 )}
               </TableBody>
             </Table>
-            </div>
+              </div>
+            )}
             <MobileListContainer>
               {paginatedFarms.map((farm) => (
                 <MobileListItem key={farm.id} onEdit={() => openEdit(farm)} onDelete={() => doDelete(farm.id)}>

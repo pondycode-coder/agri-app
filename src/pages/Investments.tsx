@@ -19,6 +19,7 @@ import { PageHeader } from '@/components/PageHeader';
 import { TrendingUp, Plus, Pencil, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Pagination, PAGE_SIZE, clampPage } from '@/components/Pagination';
+import { ViewToggle, ListViewMode } from '@/components/ViewToggle';
 
 const typeLabels: Record<string, string> = {
   equipment: 'Équipement', infrastructure: 'Infrastructure', irrigation: 'Irrigation', land: 'Foncier', other: 'Autre',
@@ -43,6 +44,7 @@ export default function Investments() {
   });
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
+  const [viewMode, setViewMode] = useState<ListViewMode>('table');
   const cp = clampPage(page, investments.length);
   const paginatedInvestments = investments.slice((cp - 1) * PAGE_SIZE, cp * PAGE_SIZE);
 
@@ -96,6 +98,43 @@ export default function Investments() {
 
         <Card>
           <CardContent className="p-0">
+            <div className="flex justify-end px-4 pt-3">
+              <ViewToggle mode={viewMode} onChange={setViewMode} />
+            </div>
+            {viewMode === 'grid' ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 px-4">
+                {paginatedInvestments.length === 0 ? (
+                  <p className="col-span-full py-6 text-center text-slate-500">{t('common.noData')}</p>
+                ) : paginatedInvestments.map((inv) => (
+                  <Card key={inv.id} className="py-3">
+                    <CardContent className="p-4 space-y-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="font-semibold text-sm text-slate-800 dark:text-slate-200 truncate">{inv.name}</p>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <Button variant="ghost" size="icon" onClick={() => openEdit(inv)}><Pencil className="h-4 w-4" /></Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="ghost" size="icon" onClick={() => setDeleteId(inv.id)}><Trash2 className="h-4 w-4 text-red-500" /></Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader><AlertDialogTitle>{t('common.confirm')}</AlertDialogTitle><AlertDialogDescription>{t('common.areYouSure')}</AlertDialogDescription></AlertDialogHeader>
+                              <AlertDialogFooter><AlertDialogCancel onClick={() => setDeleteId(null)}>{t('common.cancel')}</AlertDialogCancel><AlertDialogAction onClick={handleDelete}>{t('common.delete')}</AlertDialogAction></AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+                        <Badge variant="secondary">{typeLabels[inv.type] || inv.type}</Badge>
+                        <Badge className={statusColors[inv.status] || ''}>{statusLabel(inv.status)}</Badge>
+                        <span>{inv.date}</span>
+                        <span className="text-slate-700">{formatFCFA(inv.amount)}</span>
+                        {inv.expected_return ? <span>· Retour attendu : {formatFCFA(inv.expected_return)}</span> : null}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
             <div className="hidden md:block">
             <Table>
               <TableHeader>
@@ -136,7 +175,8 @@ export default function Investments() {
                 ))}
               </TableBody>
             </Table>
-            </div>
+              </div>
+            )}
             <MobileListContainer>
               {paginatedInvestments.map((inv) => (
                 <MobileListItem key={inv.id} onEdit={() => openEdit(inv)} onDelete={() => doDelete(inv.id)}>

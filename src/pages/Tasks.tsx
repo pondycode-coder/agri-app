@@ -20,6 +20,7 @@ import { PageHeader } from '@/components/PageHeader';
 import { CheckSquare, Plus, Pencil, Trash2, ChevronDown, Search, X, Check, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Pagination, PAGE_SIZE, clampPage } from '@/components/Pagination';
+import { ViewToggle, ListViewMode } from '@/components/ViewToggle';
 import { formatFCFA } from '@/types/database';
 
 const statusColors: Record<string, string> = {
@@ -51,6 +52,7 @@ export default function Tasks() {
   const [statusFilter, setStatusFilter] = useState<'all' | FarmTask['status']>('all');
   const [dueDateFilter, setDueDateFilter] = useState('');
   const [page, setPage] = useState(1);
+  const [viewMode, setViewMode] = useState<ListViewMode>('table');
   const [fillingRemaining, setFillingRemaining] = useState(false);
 
   const refresh = () => {
@@ -322,6 +324,58 @@ export default function Tasks() {
                 )}
               </div>
             </div>
+            <div className="flex justify-end px-4 pt-3">
+              <ViewToggle mode={viewMode} onChange={setViewMode} />
+            </div>
+            {viewMode === 'grid' ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 px-4">
+                {paginatedTasks.length === 0 ? (
+                  <p className="col-span-full py-6 text-center text-slate-500">{t('common.noData')}</p>
+                ) : paginatedTasks.map((task) => (
+                  <Card key={task.id} className="py-3">
+                    <CardContent className="p-4 space-y-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="font-semibold text-sm text-slate-800 dark:text-slate-200 truncate">{task.title}</p>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <Button variant="ghost" size="icon" onClick={() => openEdit(task)}><Pencil className="h-4 w-4" /></Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="ghost" size="icon" onClick={() => setDeleteId(task.id)}><Trash2 className="h-4 w-4 text-red-500" /></Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader><AlertDialogTitle>{t('common.confirm')}</AlertDialogTitle><AlertDialogDescription>{t('common.areYouSure')}</AlertDialogDescription></AlertDialogHeader>
+                              <AlertDialogFooter><AlertDialogCancel onClick={() => setDeleteId(null)}>{t('common.cancel')}</AlertDialogCancel><AlertDialogAction onClick={handleDelete}>{t('common.delete')}</AlertDialogAction></AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      </div>
+                      <div className="space-y-0.5">
+                        {getWorkerWageBreakdown(task).length === 0 ? (
+                          <span className="text-sm text-slate-400">—</span>
+                        ) : (
+                          getWorkerWageBreakdown(task).map(({ id, name, wage, advance }) => (
+                            <div key={id} className="flex items-center justify-between gap-3 text-sm">
+                              <span className="truncate text-slate-700">{name}</span>
+                              <span className="flex items-center gap-2 text-slate-500 shrink-0">
+                                {advance > 0 && <span className="text-amber-600">(-{formatFCFA(advance)})</span>}
+                                <span>{formatFCFA(wage)}</span>
+                              </span>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500">
+                        <span>{getPlotName(task.plot_id)}</span>
+                        <Badge className={statusColors[task.status] || ''}>{statusLabel(task.status)}</Badge>
+                        {task.due_date && <span>{task.due_date}</span>}
+                        <Badge className={task.wage_paid ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}>{task.wage_paid ? t('tasks.paid') : t('tasks.unpaid')}</Badge>
+                        <span className="text-emerald-700 font-medium">{t('tasks.netToPay')} : {formatFCFA(Math.max(0, (task.wage_amount ?? 0) - (task.advance_amount ?? 0)))}</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
             <div className="hidden md:block">
             <Table>
               <TableHeader>
@@ -425,7 +479,8 @@ export default function Tasks() {
                 })}
               </TableBody>
             </Table>
-            </div>
+              </div>
+            )}
             <MobileListContainer>
               {paginatedTasks.map((task) => {
                 const batches = getAdvanceBatches(task);

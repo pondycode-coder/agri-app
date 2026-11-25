@@ -18,6 +18,7 @@ import { PageHeader } from '@/components/PageHeader';
 import { Sprout, Plus, Pencil, Trash2, Search, Timer, TrendingUp, LandPlot, Wallet, ChevronRight, ChevronDown, StickyNote } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Pagination, PAGE_SIZE, clampPage } from '@/components/Pagination';
+import { ViewToggle, ListViewMode } from '@/components/ViewToggle';
 
 const statusColors: Record<string, string> = {
   planted: 'bg-blue-100 text-blue-800',
@@ -46,6 +47,7 @@ export default function CropCycles() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'overdue' | CropCycle['status']>('all');
   const [page, setPage] = useState(1);
+  const [viewMode, setViewMode] = useState<ListViewMode>('table');
   const [harvestDialog, setHarvestDialog] = useState<{ open: boolean; cycleId: string; cycleName: string }>({ open: false, cycleId: '', cycleName: '' });
   const [harvestForm, setHarvestForm] = useState({ harvest_date: todayIso(), quantity: 0, unit: 'bunch' as string, revenue_fcfa: 0, notes: '' });
 
@@ -238,6 +240,66 @@ export default function CropCycles() {
                 </SelectContent>
               </Select>
             </div>
+            <div className="flex justify-end px-4 pt-3">
+              <ViewToggle mode={viewMode} onChange={setViewMode} />
+            </div>
+            {viewMode === 'grid' ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 px-4">
+                {paginatedCrops.length === 0 ? (
+                  <p className="col-span-full py-6 text-center text-slate-500">{t('common.noData')}</p>
+                ) : paginatedCrops.map((crop) => {
+                  const ts = totals(crop);
+                  const unitsList = Object.entries(ts.units).filter(([, q]) => q > 0);
+                  return (
+                    <Card key={crop.id} className="py-3">
+                      <CardContent className="p-4 space-y-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="font-semibold text-sm text-slate-800 dark:text-slate-200 truncate">{crop.crop_name}</p>
+                            <p className="text-xs text-slate-500 truncate">
+                              {[crop.variety, crop.season].filter(Boolean).join(' · ') || plotById(crop.plot_id)?.name || '—'}
+                            </p>
+                            <div className="pt-1">
+                              <Badge className={statusColors[crop.status] || ''}>{statusLabel(crop.status)}</Badge>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => openHarvestDialog(crop)}>
+                              <Sprout className="h-3.5 w-3.5 mr-1 text-emerald-600" />{t('crops.harvestBtn')}
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => openEdit(crop)}><Pencil className="h-4 w-4" /></Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="icon" onClick={() => setDeleteId(crop.id)}><Trash2 className="h-4 w-4 text-red-500" /></Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader><AlertDialogTitle>{t('common.confirm')}</AlertDialogTitle><AlertDialogDescription>{t('common.areYouSure')}</AlertDialogDescription></AlertDialogHeader>
+                                <AlertDialogFooter><AlertDialogCancel onClick={() => setDeleteId(null)}>{t('common.cancel')}</AlertDialogCancel><AlertDialogAction onClick={handleDeleteCycle}>{t('common.delete')}</AlertDialogAction></AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+                          <span>{plotById(crop.plot_id)?.name || '—'}</span>
+                          <span>{crop.planting_date}</span>
+                          {isOverdue(crop) && (
+                            <Badge className="bg-red-100 text-red-700"><Timer className="h-3 w-3 mr-1" />{t('crops.overdue')}</Badge>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
+                          {crop.status === 'harvested' ? (
+                            <span className="text-emerald-700 font-medium">{ts.revenue > 0 ? `Revenu : ${formatFCFA(ts.revenue)}` : unitsList.map(([u, q]) => `${q} ${yieldUnitLabel(u)}`).join(', ') || (ts.latestDate || 'récolté')}</span>
+                          ) : (
+                            <span>{crop.expected_harvest_date ? `Récolte prévue : ${crop.expected_harvest_date}` : ''}</span>
+                          )}
+                          <span>Coût : {formatFCFA(crop.estimated_cost_fcfa)}</span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            ) : (
             <div className="hidden md:block">
             <Table>
               <TableHeader>
@@ -371,7 +433,8 @@ export default function CropCycles() {
                 })}
               </TableBody>
             </Table>
-            </div>
+              </div>
+            )}
             <MobileListContainer>
               {paginatedCrops.map((crop) => {
                 const ts = totals(crop);

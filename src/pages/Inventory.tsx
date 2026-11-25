@@ -18,6 +18,7 @@ import { PageHeader } from '@/components/PageHeader';
 import { Package, Plus, Pencil, Trash2, AlertTriangle, Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Pagination, PAGE_SIZE, clampPage } from '@/components/Pagination';
+import { ViewToggle, ListViewMode } from '@/components/ViewToggle';
 
 const catLabels: Record<string, string> = {
   input: 'Intrants', pesticide: 'Phytosanitaire', tool: 'Outillage', equipment: 'Équipement', fuel: 'Carburant', packaging: 'Emballage',
@@ -35,6 +36,7 @@ export default function Inventory() {
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<'all' | InventoryItem['category']>('all');
   const [page, setPage] = useState(1);
+  const [viewMode, setViewMode] = useState<ListViewMode>('table');
 
   useEffect(() => {
     const refresh = () => {
@@ -125,6 +127,46 @@ export default function Inventory() {
                 </SelectContent>
               </Select>
             </div>
+            <div className="flex justify-end px-4 pt-3">
+              <ViewToggle mode={viewMode} onChange={setViewMode} />
+            </div>
+            {viewMode === 'grid' ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 px-4">
+                {paginatedItems.length === 0 ? (
+                  <p className="col-span-full py-6 text-center text-slate-500">{t('common.noData')}</p>
+                ) : paginatedItems.map((item) => (
+                  <Card key={item.id} className="py-3">
+                    <CardContent className="p-4 space-y-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="font-semibold text-sm text-slate-800 dark:text-slate-200 truncate">{item.name}</p>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <Button variant="ghost" size="icon" onClick={() => openEdit(item)}><Pencil className="h-4 w-4" /></Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="ghost" size="icon" onClick={() => setDeleteId(item.id)}><Trash2 className="h-4 w-4 text-red-500" /></Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader><AlertDialogTitle>{t('common.confirm')}</AlertDialogTitle><AlertDialogDescription>{t('common.areYouSure')}</AlertDialogDescription></AlertDialogHeader>
+                              <AlertDialogFooter><AlertDialogCancel onClick={() => setDeleteId(null)}>{t('common.cancel')}</AlertDialogCancel><AlertDialogAction onClick={handleDelete}>{t('common.delete')}</AlertDialogAction></AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+                        <Badge variant="secondary">{catLabels[item.category] || item.category}</Badge>
+                        <span>{item.quantity} {item.unit}</span>
+                        <span className="font-medium text-slate-700">Valeur : {formatFCFA(item.quantity * item.price_per_unit)}</span>
+                      </div>
+                      {item.quantity <= 10 && (
+                        <p className="flex items-center gap-1 text-xs font-medium text-amber-700">
+                          <AlertTriangle className="h-3 w-3" />Stock faible
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
             <div className="hidden md:block">
             <Table>
               <TableHeader>
@@ -163,7 +205,8 @@ export default function Inventory() {
                 ))}
               </TableBody>
             </Table>
-            </div>
+              </div>
+            )}
             <MobileListContainer>
               {paginatedItems.map((item) => (
                 <MobileListItem key={item.id} onEdit={() => openEdit(item)} onDelete={() => doDelete(item.id)}>
